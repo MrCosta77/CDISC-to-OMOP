@@ -1,0 +1,16 @@
+# Ambientes virtuais
+venv/
+env/
+
+# Credenciais e Variáveis de Ambiente
+.env
+
+# Ficheiros de sistema e Python cache
+__pycache__/
+*.pyc
+.DS_Store
+
+# Logs e outputs locais (para não carregares ficheiros da empresa)
+*.log
+*.csv
+*.json
