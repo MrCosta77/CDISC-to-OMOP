@@ -38,14 +38,20 @@ def main():
     run_script("src/etl/measurement.py", "4. Extract Measurements (LB + VS + EG)")
     run_script("src/etl/observation_period.py", "5. Calculate Observation Periods")
     run_script("src/etl/visit.py", "6. Derive Visits from Events")
+    run_script("src/etl/link_visits.py", "7. Link Events to Visits")
     
     # ---------------------------------------------------------
     # PHASE 3: SEMANTIC MAPPING (DETERMINISTIC + AI RAG)
     # ---------------------------------------------------------
-    run_script("src/mapping/deterministic_mapping.py", "7. Deterministic Mapping (OHDSI Vocabularies)")
-    run_script("src/mapping/llm_condition.py", "8. AI Semantic Mapping (Conditions)")
-    run_script("src/mapping/llm_drug.py", "9. AI Semantic Mapping (Drugs)")
+    run_script("src/mapping/deterministic_mapping.py", "8. Deterministic Mapping (OHDSI Vocabularies)")
+    run_script("src/mapping/llm_condition.py", "9. AI Semantic Mapping (Conditions)")
+    run_script("src/mapping/llm_drug.py", "10. AI Semantic Mapping (Drugs)")
 
+    # ---------------------------------------------------------
+    # PHASE 4: DATABASE CONSTRUCTION
+    # ---------------------------------------------------------
+    run_script("src/etl/build_database.py", "11. Build Unified DuckDB Database")
+    
     total_elapsed = time.time() - total_start
     print(f"\n🎉 PIPELINE FULLY COMPLETED IN {total_elapsed:.1f}s! 🎉")
     print("Database is now structured, domain-routed, and AI-mapped.\n")
