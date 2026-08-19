@@ -1,10 +1,12 @@
 # Data files
 data/raw/*
 data/processed/*
+data/omop_vocab/
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 *.sas7bdat
 *.csv
+*.duckdb
 
 # Python and Jupyter
 __pycache__/
