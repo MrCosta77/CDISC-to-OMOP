@@ -2,15 +2,17 @@ import pandas as pd
 import numpy as np
 import hashlib
 
+import hashlib
+
 def generate_person_id(usubjid):
     """
-    OMOP requires a numeric person_id (Integer). 
-    This function generates a deterministic hash from the USUBJID string.
+    Generates a deterministic, collision-resistant 64-bit integer
+    from the CDISC USUBJID using SHA-256.
     """
-    if pd.isna(usubjid):
-        return np.nan
-    # Use MD5 to generate a hash, convert to hex, then to a 32-bit integer
-    return int(hashlib.md5(str(usubjid).encode('utf-8')).hexdigest()[:8], 16)
+    if not usubjid:
+        return None
+    # Use SHA-256 and truncate to 15 hex characters (fits safely in 64-bit int)
+    return int(hashlib.sha256(str(usubjid).encode('utf-8')).hexdigest()[:15], 16)
 
 # OMOP Standard Concept IDs Mapping Dictionaries
 GENDER_MAP = {

@@ -30,6 +30,11 @@ def main():
     total_start = time.time()
 
     # ---------------------------------------------------------
+    # PHASE 1: VOCABULARIES SETUP
+    # ---------------------------------------------------------
+    run_script("src/utils/setup_vocab.py", "0. Setup OMOP Vocabularies")
+
+    # ---------------------------------------------------------
     # PHASE 2: STRUCTURAL ETL (CDISC -> OMOP)
     # ---------------------------------------------------------
     run_script("src/etl/person.py", "1. Extract Demographics (DM)")

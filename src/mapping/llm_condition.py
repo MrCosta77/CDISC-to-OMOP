@@ -66,14 +66,24 @@ def ask_llm_to_pick(raw_term, candidates):
                 {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': user_prompt}
             ],
-            options={'temperature': 0.0} # We want strict, deterministic reasoning
+            options={'temperature': 0.0} # Strict and deterministic reasoning
         )
         
-        # Clean the output to ensure we only get digits
         result_text = response['message']['content'].strip()
         match = re.search(r'\d+', result_text)
+        
         if match:
-            return int(match.group())
+            chosen_id = int(match.group())
+            
+            # 🛡️ SECURITY GATE: Ensure the LLM didn't hallucinate an ID
+            candidate_ids = [int(c[0]) for c in candidates]
+            
+            if chosen_id in candidate_ids:
+                return chosen_id
+            else:
+                print(f"   ⚠️ Warning: LLM hallucinated ID {chosen_id} (not in candidates). Rejecting.")
+                return 0
+                
         return 0
         
     except Exception as e:
