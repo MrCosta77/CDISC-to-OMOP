@@ -12,3 +12,6 @@ data/omop_vocab/
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints
+
+# Environments
+.env

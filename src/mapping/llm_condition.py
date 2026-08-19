@@ -75,15 +75,17 @@ def ask_llm_to_pick(raw_term, candidates):
         if match:
             chosen_id = int(match.group())
             
+            if chosen_id == 0:
+                return 0
+                
             # 🛡️ SECURITY GATE: Ensure the LLM didn't hallucinate an ID
             candidate_ids = [int(c[0]) for c in candidates]
             
             if chosen_id in candidate_ids:
                 return chosen_id
             else:
-                print(f"   ⚠️ Warning: LLM hallucinated ID {chosen_id} (not in candidates). Rejecting.")
+                print(f"   ⚠️ Warning: LLM actually hallucinated ID {chosen_id} (not in candidates). Rejecting.")
                 return 0
-                
         return 0
         
     except Exception as e:
@@ -134,16 +136,45 @@ def run_llm_condition_mapping():
 
     # Apply the AI mappings to the dataframe
     if mapping_dict:
-        # Create a boolean mask for rows that are currently 0 and have a newly discovered mapping
         mask = (df_cond['condition_concept_id'] == 0) & (df_cond['condition_source_value'].isin(mapping_dict.keys()))
+        
+        # 1. Grab the rows we are about to update to log them in the audit trail
+        rows_to_audit = df_cond[mask][['condition_occurrence_id', 'condition_source_value']]
+        
+        # 2. Update CSV
         df_cond.loc[mask, 'condition_concept_id'] = df_cond.loc[mask, 'condition_source_value'].map(mapping_dict)
-        
-        # Ensure integers are preserved
         df_cond['condition_concept_id'] = df_cond['condition_concept_id'].astype('Int64')
-        
         df_cond.to_csv(condition_path, index=False)
+        
+        # 3. Write Provenance to DuckDB
+        with duckdb.connect(DB_PATH) as con:
+            try:
+                vocab_version = con.execute("SELECT vocabulary_version FROM vocabulary WHERE vocabulary_id = 'None'").fetchone()[0]
+            except:
+                vocab_version = 'Athena_Standard'
+                
+            for _, row in rows_to_audit.iterrows():
+                term = row['condition_source_value']
+                con.execute("""
+                    INSERT INTO mapping_provenance (
+                        target_table, target_id, source_value, normalized_value,
+                        assigned_concept_id, mapping_method, score, model_name,
+                        vocabulary_version, reviewed_by
+                    ) VALUES (
+                        'condition_occurrence', ?, ?, ?, ?, 'llm_zero_shot', 0.9, ?, ?, 'Pending_Human_Review'
+                    )
+                """, (
+                    int(row['condition_occurrence_id']), 
+                    term, 
+                    term, 
+                    int(mapping_dict[term]), 
+                    MODEL_NAME, 
+                    vocab_version
+                ))
+                
         print("\n" + "-" * 70)
         print(f"💾 File updated: CONDITION_OCCURRENCE.csv")
+        print("✅ Provenance Audit successfully updated in DuckDB!")
         print(f"🏆 AI successfully resolved {len(mapping_dict)} out of {len(orphan_terms)} orphan conditions!")
     else:
         print("\n" + "-" * 70)

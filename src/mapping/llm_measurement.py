@@ -22,7 +22,7 @@ def get_candidates_from_db(term, con):
     query = f"""
         SELECT concept_id, concept_name 
         FROM concept 
-        WHERE domain_id = 'Drug' 
+        WHERE domain_id = 'Measurement' 
           AND standard_concept = 'S' 
           AND ({conditions})
         ORDER BY LENGTH(concept_name) ASC
@@ -31,7 +31,7 @@ def get_candidates_from_db(term, con):
     return con.execute(query).fetchall()
 
 def ask_llm_to_pick(raw_term, candidates):
-    """Prompts the local LLM to select the best matching concept ID."""
+    """Prompts the local LLM to select the best matching LOINC ID from the candidates."""
     if not candidates:
         return 0
 
@@ -39,12 +39,12 @@ def ask_llm_to_pick(raw_term, candidates):
     
     system_prompt = """
     You are a highly skilled Clinical Data Scientist specializing in the OMOP Common Data Model.
-    Your task is to map a raw clinical trial drug to the best matching standard RxNorm concept from a provided list.
+    Your task is to map a raw clinical trial measurement, lab test, or vital sign to the best matching standard LOINC concept from a provided list.
     
     CRITICAL RULES:
     1. Reply ONLY with the integer ID of the best match.
     2. Do NOT include any explanations, markdown, or extra text.
-    3. If none of the candidates are a clinically valid match for the raw term (e.g., if it is a blinded "Placebo" or "Active Drug" from a clinical trial), reply with 0.
+    3. If none of the candidates are a clinically valid match for the raw term, reply with 0.
     """
     
     user_prompt = f"""
@@ -63,7 +63,7 @@ def ask_llm_to_pick(raw_term, candidates):
                 {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': user_prompt}
             ],
-            options={'temperature': 0.0} # Strict and deterministic reasoning
+            options={'temperature': 0.0} # Strict and deterministic
         )
         
         result_text = response['message']['content'].strip()
@@ -72,6 +72,7 @@ def ask_llm_to_pick(raw_term, candidates):
         if match:
             chosen_id = int(match.group())
             
+            # The LLM correctly rejected the candidates based on Rule 3
             if chosen_id == 0:
                 return 0
                 
@@ -90,24 +91,24 @@ def ask_llm_to_pick(raw_term, candidates):
         print(f"⚠️ LLM Request Failed for '{raw_term}': {e}")
         return 0
 
-def run_llm_drug_mapping():
-    print(f"💊 STARTING AI SEMANTIC MAPPING FOR DRUGS (MODEL: {MODEL_NAME})")
+def run_llm_measurement_mapping():
+    print(f"🔬 STARTING AI SEMANTIC MAPPING FOR MEASUREMENTS (MODEL: {MODEL_NAME})")
     print("-" * 70)
     
-    drug_path = os.path.join(PROJECT_ROOT, "data", "processed", "DRUG_EXPOSURE.csv")
+    meas_path = os.path.join(PROJECT_ROOT, "data", "processed", "MEASUREMENT.csv")
     
     try:
-        df_drug = pd.read_csv(drug_path)
+        df_meas = pd.read_csv(meas_path)
     except FileNotFoundError:
-        print("❌ Error: DRUG_EXPOSURE.csv not found.")
+        print("❌ Error: MEASUREMENT.csv not found.")
         return
 
     # Identify orphans
-    unmapped_mask = df_drug['drug_concept_id'] == 0
-    orphan_terms = df_drug[unmapped_mask]['drug_source_value'].dropna().unique()
+    unmapped_mask = df_meas['measurement_concept_id'] == 0
+    orphan_terms = df_meas[unmapped_mask]['measurement_source_value'].dropna().unique()
     
     if len(orphan_terms) == 0:
-        print("✅ No unmapped drugs found! Everything is already standard.")
+        print("✅ No unmapped measurements found! Everything is already standard.")
         return
         
     print(f"Found {len(orphan_terms)} orphan clinical terms. Handing over to AI...")
@@ -133,17 +134,17 @@ def run_llm_drug_mapping():
 
     # Apply the AI mappings to the dataframe
     if mapping_dict:
-        mask = (df_drug['drug_concept_id'] == 0) & (df_drug['drug_source_value'].isin(mapping_dict.keys()))
+        mask = (df_meas['measurement_concept_id'] == 0) & (df_meas['measurement_source_value'].isin(mapping_dict.keys()))
         
-        # 1. Grab the rows we are about to update to log them in the audit trail
-        rows_to_audit = df_drug[mask][['drug_exposure_id', 'drug_source_value']]
+        # Grab rows for audit trail
+        rows_to_audit = df_meas[mask][['measurement_id', 'measurement_source_value']]
         
-        # 2. Update CSV
-        df_drug.loc[mask, 'drug_concept_id'] = df_drug.loc[mask, 'drug_source_value'].map(mapping_dict)
-        df_drug['drug_concept_id'] = df_drug['drug_concept_id'].astype('Int64')
-        df_drug.to_csv(drug_path, index=False)
+        # Update CSV
+        df_meas.loc[mask, 'measurement_concept_id'] = df_meas.loc[mask, 'measurement_source_value'].map(mapping_dict)
+        df_meas['measurement_concept_id'] = df_meas['measurement_concept_id'].astype('Int64')
+        df_meas.to_csv(meas_path, index=False)
         
-        # 3. Write Provenance to DuckDB
+        # Write Provenance to DuckDB
         with duckdb.connect(DB_PATH) as con:
             try:
                 vocab_version = con.execute("SELECT vocabulary_version FROM vocabulary WHERE vocabulary_id = 'None'").fetchone()[0]
@@ -151,17 +152,17 @@ def run_llm_drug_mapping():
                 vocab_version = 'Athena_Standard'
                 
             for _, row in rows_to_audit.iterrows():
-                term = row['drug_source_value']
+                term = row['measurement_source_value']
                 con.execute("""
                     INSERT INTO mapping_provenance (
                         target_table, target_id, source_value, normalized_value,
                         assigned_concept_id, mapping_method, score, model_name,
                         vocabulary_version, reviewed_by
                     ) VALUES (
-                        'drug_exposure', ?, ?, ?, ?, 'llm_zero_shot', 0.9, ?, ?, 'Pending_Human_Review'
+                        'measurement', ?, ?, ?, ?, 'llm_zero_shot', 0.9, ?, ?, 'Pending_Human_Review'
                     )
                 """, (
-                    int(row['drug_exposure_id']), 
+                    int(row['measurement_id']), 
                     term, 
                     term, 
                     int(mapping_dict[term]), 
@@ -170,12 +171,12 @@ def run_llm_drug_mapping():
                 ))
                 
         print("\n" + "-" * 70)
-        print(f"💾 File updated: DRUG_EXPOSURE.csv")
+        print(f"💾 File updated: MEASUREMENT.csv")
         print("✅ Provenance Audit successfully updated in DuckDB!")
-        print(f"🏆 AI successfully resolved {len(mapping_dict)} out of {len(orphan_terms)} orphan drugs!")
+        print(f"🏆 AI successfully resolved {len(mapping_dict)} out of {len(orphan_terms)} orphan measurements!")
     else:
         print("\n" + "-" * 70)
         print("📉 AI could not confidently map any of the orphan terms.")
 
 if __name__ == "__main__":
-    run_llm_drug_mapping()
+    run_llm_measurement_mapping()
