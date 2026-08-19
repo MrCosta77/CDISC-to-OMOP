@@ -37,13 +37,14 @@ def main():
     run_script("src/etl/drug.py", "3. Extract Medications (EX + CM)")
     run_script("src/etl/measurement.py", "4. Extract Measurements (LB + VS + EG)")
     run_script("src/etl/observation_period.py", "5. Calculate Observation Periods")
+    run_script("src/etl/visit.py", "6. Derive Visits from Events")
     
     # ---------------------------------------------------------
     # PHASE 3: SEMANTIC MAPPING (DETERMINISTIC + AI RAG)
     # ---------------------------------------------------------
-    run_script("src/mapping/deterministic_mapping.py", "5. Deterministic Mapping (OHDSI Vocabularies)")
-    run_script("src/mapping/llm_condition.py", "6. AI Semantic Mapping (Conditions)")
-    run_script("src/mapping/llm_drug.py", "7. AI Semantic Mapping (Drugs)")
+    run_script("src/mapping/deterministic_mapping.py", "7. Deterministic Mapping (OHDSI Vocabularies)")
+    run_script("src/mapping/llm_condition.py", "8. AI Semantic Mapping (Conditions)")
+    run_script("src/mapping/llm_drug.py", "9. AI Semantic Mapping (Drugs)")
 
     total_elapsed = time.time() - total_start
     print(f"\n🎉 PIPELINE FULLY COMPLETED IN {total_elapsed:.1f}s! 🎉")
