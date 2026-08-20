@@ -45,7 +45,7 @@ A production-ready, end-to-end clinical data engineering pipeline demonstrating 
 
 **1. Clone the repository:**
 ```bash
-git clone https://github.com/YourUsername/CDISC-to-OMOP.git
+git clone https://github.com/MrCosta77/CDISC-to-OMOP
 cd CDISC-to-OMOP
 ```
 
