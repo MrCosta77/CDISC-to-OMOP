@@ -712,3 +712,93 @@
 2026-08-20 01:51:08 | INFO     | Orchestrator    | 🎉 PIPELINE FULLY COMPLETED IN 70.9s! 🎉
 2026-08-20 01:51:08 | INFO     | Orchestrator    | Database is now structured, domain-routed, and AI-mapped.
 
+2026-08-20 03:38:15 | INFO     | Orchestrator    | 🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥
+2026-08-20 03:38:15 | INFO     | Orchestrator    |       CDISC TO OMOP - FULL ORCHESTRATOR
+2026-08-20 03:38:15 | INFO     | Orchestrator    | 🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥
+2026-08-20 03:38:15 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:15 | INFO     | Orchestrator    | 🚀 RUNNING: 0. Setup OMOP Vocabularies
+2026-08-20 03:38:15 | INFO     | Orchestrator    | 📄 Script:  src/utils/setup_vocab.py
+2026-08-20 03:38:15 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:41 | INFO     | Orchestrator    | ✅ SUCCESS: '0. Setup OMOP Vocabularies' completed in 26.3 seconds.
+
+2026-08-20 03:38:41 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:41 | INFO     | Orchestrator    | 🚀 RUNNING: 0b. Setup Audit and Provenance
+2026-08-20 03:38:41 | INFO     | Orchestrator    | 📄 Script:  src/utils/setup_audit.py
+2026-08-20 03:38:41 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:43 | INFO     | Orchestrator    | ✅ SUCCESS: '0b. Setup Audit and Provenance' completed in 1.9 seconds.
+
+2026-08-20 03:38:43 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:43 | INFO     | Orchestrator    | 🚀 RUNNING: 1. Extract Demographics (DM)
+2026-08-20 03:38:43 | INFO     | Orchestrator    | 📄 Script:  src/etl/person.py
+2026-08-20 03:38:43 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:43 | INFO     | Orchestrator    | ✅ SUCCESS: '1. Extract Demographics (DM)' completed in 0.7 seconds.
+
+2026-08-20 03:38:43 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:43 | INFO     | Orchestrator    | 🚀 RUNNING: 2. Extract Conditions (AE + MH)
+2026-08-20 03:38:43 | INFO     | Orchestrator    | 📄 Script:  src/etl/condition.py
+2026-08-20 03:38:43 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:44 | INFO     | Orchestrator    | ✅ SUCCESS: '2. Extract Conditions (AE + MH)' completed in 0.7 seconds.
+
+2026-08-20 03:38:44 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:44 | INFO     | Orchestrator    | 🚀 RUNNING: 3. Extract Medications (EX + CM)
+2026-08-20 03:38:44 | INFO     | Orchestrator    | 📄 Script:  src/etl/drug.py
+2026-08-20 03:38:44 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:45 | INFO     | Orchestrator    | ✅ SUCCESS: '3. Extract Medications (EX + CM)' completed in 0.7 seconds.
+
+2026-08-20 03:38:45 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:45 | INFO     | Orchestrator    | 🚀 RUNNING: 4. Extract Measurements (LB + VS + EG)
+2026-08-20 03:38:45 | INFO     | Orchestrator    | 📄 Script:  src/etl/measurement.py
+2026-08-20 03:38:45 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:46 | INFO     | Orchestrator    | ✅ SUCCESS: '4. Extract Measurements (LB + VS + EG)' completed in 1.0 seconds.
+
+2026-08-20 03:38:46 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:46 | INFO     | Orchestrator    | 🚀 RUNNING: 5. Calculate Observation Periods
+2026-08-20 03:38:46 | INFO     | Orchestrator    | 📄 Script:  src/etl/observation_period.py
+2026-08-20 03:38:46 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:47 | INFO     | Orchestrator    | ✅ SUCCESS: '5. Calculate Observation Periods' completed in 0.7 seconds.
+
+2026-08-20 03:38:47 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:47 | INFO     | Orchestrator    | 🚀 RUNNING: 6. Derive Visits from Events
+2026-08-20 03:38:47 | INFO     | Orchestrator    | 📄 Script:  src/etl/visit.py
+2026-08-20 03:38:47 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:47 | INFO     | Orchestrator    | ✅ SUCCESS: '6. Derive Visits from Events' completed in 0.6 seconds.
+
+2026-08-20 03:38:47 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:47 | INFO     | Orchestrator    | 🚀 RUNNING: 7. Link Events to Visits
+2026-08-20 03:38:47 | INFO     | Orchestrator    | 📄 Script:  src/etl/link_visits.py
+2026-08-20 03:38:47 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:48 | INFO     | Orchestrator    | ✅ SUCCESS: '7. Link Events to Visits' completed in 0.7 seconds.
+
+2026-08-20 03:38:48 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:48 | INFO     | Orchestrator    | 🚀 RUNNING: 8. Deterministic Mapping (OHDSI Vocabularies)
+2026-08-20 03:38:48 | INFO     | Orchestrator    | 📄 Script:  src/mapping/deterministic_mapping.py
+2026-08-20 03:38:48 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:55 | INFO     | Orchestrator    | ✅ SUCCESS: '8. Deterministic Mapping (OHDSI Vocabularies)' completed in 7.5 seconds.
+
+2026-08-20 03:38:55 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:38:55 | INFO     | Orchestrator    | 🚀 RUNNING: 9. AI Semantic Mapping (Conditions)
+2026-08-20 03:38:55 | INFO     | Orchestrator    | 📄 Script:  src/mapping/llm_condition.py
+2026-08-20 03:38:55 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:39:07 | INFO     | Orchestrator    | ✅ SUCCESS: '9. AI Semantic Mapping (Conditions)' completed in 12.0 seconds.
+
+2026-08-20 03:39:07 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:39:07 | INFO     | Orchestrator    | 🚀 RUNNING: 10. AI Semantic Mapping (Drugs)
+2026-08-20 03:39:07 | INFO     | Orchestrator    | 📄 Script:  src/mapping/llm_drug.py
+2026-08-20 03:39:07 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:39:10 | INFO     | Orchestrator    | ✅ SUCCESS: '10. AI Semantic Mapping (Drugs)' completed in 2.1 seconds.
+
+2026-08-20 03:39:10 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:39:10 | INFO     | Orchestrator    | 🚀 RUNNING: 11. AI Semantic Mapping (Measurements)
+2026-08-20 03:39:10 | INFO     | Orchestrator    | 📄 Script:  src/mapping/llm_measurement.py
+2026-08-20 03:39:10 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:39:19 | INFO     | Orchestrator    | ✅ SUCCESS: '11. AI Semantic Mapping (Measurements)' completed in 9.4 seconds.
+
+2026-08-20 03:39:19 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:39:19 | INFO     | Orchestrator    | 🚀 RUNNING: 12. Build Unified DuckDB Database
+2026-08-20 03:39:19 | INFO     | Orchestrator    | 📄 Script:  src/etl/build_database.py
+2026-08-20 03:39:19 | INFO     | Orchestrator    | ======================================================================
+2026-08-20 03:39:20 | INFO     | Orchestrator    | ✅ SUCCESS: '12. Build Unified DuckDB Database' completed in 0.9 seconds.
+
+2026-08-20 03:39:20 | INFO     | Orchestrator    | 🎉 PIPELINE FULLY COMPLETED IN 65.3s! 🎉
+2026-08-20 03:39:20 | INFO     | Orchestrator    | Database is now structured, domain-routed, and AI-mapped.
+
