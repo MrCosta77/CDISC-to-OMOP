@@ -1,76 +1,82 @@
 import pandas as pd
+import numpy as np
 import os
 import sys
+from pathlib import Path
 
-# Add the src directory to the python path to import utils
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+# Setup paths
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(PROJECT_ROOT))
+from src.utils.helpers import generate_person_id
 
 def run_observation_period_etl():
-    print("⏳ Calculating OBSERVATION_PERIOD from clinical events...")
+    print("⏳ Calculating OBSERVATION_PERIOD...")
     
-    processed_dir = os.path.join("data", "processed")
-    
+    dm_path = os.path.join(PROJECT_ROOT, "data", "raw", "dm.sas7bdat")
     try:
-        df_cond = pd.read_csv(os.path.join(processed_dir, "CONDITION_OCCURRENCE.csv"), usecols=['person_id', 'condition_start_date', 'condition_end_date'])
-        df_drug = pd.read_csv(os.path.join(processed_dir, "DRUG_EXPOSURE.csv"), usecols=['person_id', 'drug_exposure_start_date', 'drug_exposure_end_date'])
-        df_meas = pd.read_csv(os.path.join(processed_dir, "MEASUREMENT.csv"), usecols=['person_id', 'measurement_date'])
-    except FileNotFoundError as e:
-        print(f"❌ Error loading processed files for Observation Period: {e}")
-        print("Make sure to run the clinical ETL scripts first.")
+        df_dm = pd.read_sas(dm_path, encoding='utf-8')
+    except Exception as e:
+        print(f"❌ Error reading DM file: {e}")
         return
 
-    # 1. Gather all dates from all domains
-    date_frames = []
+    df_dm['person_id'] = df_dm['USUBJID'].apply(generate_person_id)
+    df_dm = df_dm.dropna(subset=['person_id'])
+
+    # 1. SAFE EXTRACTION: Use .get() so it doesn't crash if columns are missing
+    df_dm['start_date'] = pd.to_datetime(df_dm.get('RFSTDTC'), errors='coerce')
+    df_dm['end_date'] = pd.to_datetime(df_dm.get('RFENDTC'), errors='coerce')
     
-    if not df_cond.empty:
-        date_frames.append(df_cond[['person_id', 'condition_start_date']].rename(columns={'condition_start_date': 'date'}))
-        date_frames.append(df_cond[['person_id', 'condition_end_date']].rename(columns={'condition_end_date': 'date'}))
+    # 2. FALLBACK LOGIC: If dates are missing, use active clinical events
+    # CRITICAL: We explicitly EXCLUDE Medical History (MH) to avoid 30-year biases!
+    raw_files = {
+        'ae': ('AESTDTC', 'AEENDTC'),
+        'ex': ('EXSTDTC', 'EXENDTC'),
+        'lb': ('LBDTC', 'LBDTC'),
+        'vs': ('VSDTC', 'VSDTC'),
+        'eg': ('EGDTC', 'EGDTC')
+    }
+    
+    event_dates = []
+    for domain, (start_col, end_col) in raw_files.items():
+        path = os.path.join(PROJECT_ROOT, "data", "raw", f"{domain}.sas7bdat")
+        if os.path.exists(path):
+            df = pd.read_sas(path, encoding='utf-8')
+            df['person_id'] = df['USUBJID'].apply(generate_person_id)
+            
+            if start_col in df.columns:
+                event_dates.append(df[['person_id', start_col]].rename(columns={start_col: 'date'}))
+            if end_col in df.columns:
+                event_dates.append(df[['person_id', end_col]].rename(columns={end_col: 'date'}))
+                
+    if event_dates:
+        df_events = pd.concat(event_dates, ignore_index=True)
+        df_events['date'] = pd.to_datetime(df_events['date'], errors='coerce')
+        df_events = df_events.dropna(subset=['date'])
         
-    if not df_drug.empty:
-        date_frames.append(df_drug[['person_id', 'drug_exposure_start_date']].rename(columns={'drug_exposure_start_date': 'date'}))
-        date_frames.append(df_drug[['person_id', 'drug_exposure_end_date']].rename(columns={'drug_exposure_end_date': 'date'}))
+        # Get min and max active date per person
+        agg_dates = df_events.groupby('person_id')['date'].agg(['min', 'max']).reset_index()
         
-    if not df_meas.empty:
-        date_frames.append(df_meas[['person_id', 'measurement_date']].rename(columns={'measurement_date': 'date'}))
-        
-    # Combine everything and drop missing dates
-    df_all_dates = pd.concat(date_frames).dropna()
+        # Fill missing dates in DM
+        df_dm = df_dm.merge(agg_dates, on='person_id', how='left')
+        df_dm['start_date'] = df_dm['start_date'].fillna(df_dm['min'])
+        df_dm['end_date'] = df_dm['end_date'].fillna(df_dm['max']).fillna(df_dm['start_date'])
+
+    # Drop rows where we absolutely cannot determine a start date
+    df_dm = df_dm.dropna(subset=['start_date'])
+
+    # 3. Build OMOP OBSERVATION_PERIOD table
+    df_obs = pd.DataFrame({
+        'observation_period_id': range(1, len(df_dm) + 1),
+        'person_id': df_dm['person_id'].astype('Int64'),
+        'observation_period_start_date': df_dm['start_date'].dt.date,
+        'observation_period_end_date': df_dm['end_date'].dt.date,
+        'period_type_concept_id': 32817 # EHR clinical data concept
+    })
+
+    out_path = os.path.join(PROJECT_ROOT, "data", "processed", "OBSERVATION_PERIOD.csv")
+    df_obs.to_csv(out_path, index=False)
     
-    # Convert to strict datetime for accurate min/max calculations
-    df_all_dates['date'] = pd.to_datetime(df_all_dates['date'], errors='coerce')
-    df_all_dates = df_all_dates.dropna()
-    
-    # 2. Group by person to find absolute first and last clinical interaction
-    print("🧠 Aggregating longitudinal timelines per patient...")
-    obs_period = df_all_dates.groupby('person_id')['date'].agg(['min', 'max']).reset_index()
-    
-    # Rename columns to match OMOP standard
-    obs_period.rename(columns={
-        'min': 'observation_period_start_date',
-        'max': 'observation_period_end_date'
-    }, inplace=True)
-    
-    # 3. Add mandatory OMOP fields
-    obs_period['observation_period_id'] = range(1, len(obs_period) + 1)
-    obs_period['period_type_concept_id'] = 32817 # OMOP standard for "EHR"
-    
-    # Format dates back to clean strings (YYYY-MM-DD)
-    obs_period['observation_period_start_date'] = obs_period['observation_period_start_date'].dt.strftime('%Y-%m-%d')
-    obs_period['observation_period_end_date'] = obs_period['observation_period_end_date'].dt.strftime('%Y-%m-%d')
-    
-    # Reorder columns
-    final_cols = ['observation_period_id', 'person_id', 'observation_period_start_date', 'observation_period_end_date', 'period_type_concept_id']
-    obs_period = obs_period[final_cols]
-    
-    # Ensure integers are clean
-    obs_period['observation_period_id'] = obs_period['observation_period_id'].astype('Int64')
-    obs_period['person_id'] = obs_period['person_id'].astype('Int64')
-    
-    output_path = os.path.join(processed_dir, "OBSERVATION_PERIOD.csv")
-    obs_period.to_csv(output_path, index=False)
-    
-    print(f"✅ OBSERVATION_PERIOD successfully generated with {len(obs_period)} records!")
-    print(obs_period.head())
+    print(f"✅ OBSERVATION_PERIOD successfully generated with {len(df_obs)} records!")
 
 if __name__ == "__main__":
     run_observation_period_etl()

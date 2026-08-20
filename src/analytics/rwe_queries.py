@@ -30,10 +30,10 @@ def run_analytics():
         print(f"Average Follow-up (Days):    {pop_res[1]}\n")
 
         gender_query = """
-            SELECT c.concept_name, COUNT(p.person_id) as count
+            SELECT COALESCE(c.concept_name, 'Unknown'), COUNT(p.person_id) as count
             FROM person p
-            JOIN concept c ON p.gender_concept_id = c.concept_id
-            GROUP BY c.concept_name
+            LEFT JOIN concept c ON p.gender_concept_id = c.concept_id
+            GROUP BY 1
         """
         print("Gender Distribution:")
         for row in con.execute(gender_query).fetchall():
@@ -56,7 +56,6 @@ def run_analytics():
             print(f" - {row[0]:<40} | {row[1]} occurrences")
         print("\n")
 
-        # 3. ESTATÍSTICAS DE LABORATÓRIO (Métricas Médias)
         print("3. LABORATORY BASELINES (Average Values)")
         print("-" * 60)
         lab_query = """
@@ -74,7 +73,6 @@ def run_analytics():
             print(f" - {row[0]:<30} | {row[1]:>6} {row[2]}")
         print("\n")
 
-        # 4. FENOTIPAGEM: USO DE MEDICAÇÃO DE RESGATE (Paracetamol)
         print("4. PHENOTYPING: RESCUE MEDICATION USAGE (Paracetamol/Acetaminophen)")
         print("-" * 60)
         rescue_query = """

@@ -61,7 +61,7 @@ def run_drug_etl(ex_path, cm_path, output_path):
                 'drug_exposure_id': drug_id_counter,
                 'person_id': generate_person_id(row.get('USUBJID')),
                 'drug_concept_id': 0, # Pending AI Mapping to RxNorm
-                'drug_type_concept_id': 32817, # OMOP standard for "EHR" (General medical history)
+                'drug_type_concept_id': 32817, # OMOP standard for "EHR"
                 'drug_exposure_start_date': start_date.date() if pd.notna(start_date) else np.nan,
                 'drug_exposure_start_datetime': start_date if pd.notna(start_date) else pd.NaT,
                 'drug_exposure_end_date': end_date.date() if pd.notna(end_date) else np.nan,

@@ -10,25 +10,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 from src.utils.config import DB_PATH, MODEL_NAME
-
-def get_candidates_from_db(term, con):
-    """Fetches potential standard concepts from DuckDB using keyword matching."""
-    words = [w for w in re.split(r'\W+', term) if len(w) > 3]
-    if not words:
-        words = [term]
-        
-    conditions = " OR ".join([f"LOWER(concept_name) LIKE '%{w.lower()}%'" for w in words])
-    
-    query = f"""
-        SELECT concept_id, concept_name 
-        FROM concept 
-        WHERE domain_id = 'Drug' 
-          AND standard_concept = 'S' 
-          AND ({conditions})
-        ORDER BY LENGTH(concept_name) ASC
-        LIMIT 15
-    """
-    return con.execute(query).fetchall()
+from src.mapping.llm_shared import get_candidates_from_db_safe, calculate_confidence_score
 
 def ask_llm_to_pick(raw_term, candidates):
     """Prompts the local LLM to select the best matching concept ID."""
@@ -116,7 +98,7 @@ def run_llm_drug_mapping():
     with duckdb.connect(DB_PATH) as con:
         for term in orphan_terms:
             print(f"\n🔍 Processing: '{term}'")
-            candidates = get_candidates_from_db(term, con)
+            candidates = get_candidates_from_db_safe(term, con, 'Drug')
             
             if candidates:
                 print(f"   - Retrieved {len(candidates)} candidates from DuckDB. Asking LLM...")
@@ -143,28 +125,37 @@ def run_llm_drug_mapping():
         df_drug['drug_concept_id'] = df_drug['drug_concept_id'].astype('Int64')
         df_drug.to_csv(drug_path, index=False)
         
-        # 3. Write Provenance to DuckDB
+        # Write Provenance to DuckDB
         with duckdb.connect(DB_PATH) as con:
             try:
                 vocab_version = con.execute("SELECT vocabulary_version FROM vocabulary WHERE vocabulary_id = 'None'").fetchone()[0]
-            except:
+            except duckdb.CatalogException:
                 vocab_version = 'Athena_Standard'
                 
             for _, row in rows_to_audit.iterrows():
-                term = row['drug_source_value']
+                term = row['drug_source_value'] # <-- Nome da coluna corrigido
+                chosen_id = int(mapping_dict[term])
+                
+                # Fetch the exact name the LLM picked to calculate the score
+                chosen_name = con.execute("SELECT concept_name FROM concept WHERE concept_id = ?", [chosen_id]).fetchone()[0]
+                
+                # Real Math instead of fake '0.9'
+                real_score = calculate_confidence_score(term, chosen_name)
+                
                 con.execute("""
                     INSERT INTO mapping_provenance (
                         target_table, target_id, source_value, normalized_value,
                         assigned_concept_id, mapping_method, score, model_name,
                         vocabulary_version, reviewed_by
                     ) VALUES (
-                        'drug_exposure', ?, ?, ?, ?, 'llm_zero_shot', 0.9, ?, ?, 'Pending_Human_Review'
+                        'drug_exposure', ?, ?, ?, ?, 'llm_zero_shot', ?, ?, ?, 'Pending_Human_Review'
                     )
                 """, (
-                    int(row['drug_exposure_id']), 
+                    int(row['drug_exposure_id']), # <-- ID corrigido
                     term, 
                     term, 
-                    int(mapping_dict[term]), 
+                    chosen_id, 
+                    real_score, 
                     MODEL_NAME, 
                     vocab_version
                 ))

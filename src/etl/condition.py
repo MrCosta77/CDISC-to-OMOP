@@ -28,7 +28,7 @@ def run_etl_condition(ae_path, mh_path, output_path):
             
             # Prioritize AETERM, fallback to AEDECOD if empty
             source_value = row.get('AETERM')
-            if pd.isna(source_value):
+            if pd.isna(source_value) or str(source_value).strip() == '':
                 source_value = row.get('AEDECOD')
 
             condition_records.append({
