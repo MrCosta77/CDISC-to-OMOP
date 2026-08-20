@@ -7,3 +7,4 @@ ollama>=0.1.0
 python-dotenv
 thefuzz>=0.20.0
 python-Levenshtein>=0.23.0
+pytest>=8.0.0

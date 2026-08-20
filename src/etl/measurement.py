@@ -5,7 +5,7 @@ import os
 
 # Add the src directory to the python path to import utils
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from src.utils.helpers import generate_person_id
+from src.utils.helpers import first_numeric_value, generate_person_id, parse_cdisc_date
 
 def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
     """
@@ -23,7 +23,7 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
         df_lb = pd.read_sas(lb_path, format="sas7bdat", encoding="utf-8")
         
         for _, row in df_lb.iterrows():
-            obs_date = pd.to_datetime(row.get('LBDTC'), errors='coerce')
+            obs_date = parse_cdisc_date(row.get('LBDTC'))
             
             measurement_records.append({
                 'measurement_id': measurement_id_counter,
@@ -32,7 +32,7 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'measurement_type_concept_id': 32838, # OMOP standard for "Clinical Study Observation"
                 'measurement_date': obs_date.date() if pd.notna(obs_date) else np.nan,
                 'measurement_datetime': obs_date if pd.notna(obs_date) else pd.NaT,
-                'value_as_number': row.get('LBSTRESN') if 'LBSTRESN' in row else np.nan,
+                'value_as_number': first_numeric_value(row, 'LBSTRESN', 'LBORRES'),
                 'value_source_value': row.get('LBORRES'),
                 'unit_source_value': row.get('LBORRESU'),
                 'measurement_source_value': row.get('LBTEST'),
@@ -50,7 +50,7 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
         df_vs = pd.read_sas(vs_path, format="sas7bdat", encoding="utf-8")
         
         for _, row in df_vs.iterrows():
-            obs_date = pd.to_datetime(row.get('VSDTC'), errors='coerce')
+            obs_date = parse_cdisc_date(row.get('VSDTC'))
             
             measurement_records.append({
                 'measurement_id': measurement_id_counter,
@@ -59,7 +59,7 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'measurement_type_concept_id': 32838, 
                 'measurement_date': obs_date.date() if pd.notna(obs_date) else np.nan,
                 'measurement_datetime': obs_date if pd.notna(obs_date) else pd.NaT,
-                'value_as_number': row.get('VSSTRESN') if 'VSSTRESN' in row else np.nan,
+                'value_as_number': first_numeric_value(row, 'VSSTRESN', 'VSORRES'),
                 'value_source_value': row.get('VSORRES'),
                 'unit_source_value': row.get('VSORRESU'),
                 'measurement_source_value': row.get('VSTEST'),
@@ -75,9 +75,31 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
     print(f"🫀 Reading CDISC ECG Results from: {eg_path}")
     try:
         df_eg = pd.read_sas(eg_path, format="sas7bdat", encoding="utf-8")
+
+        required_columns = {'USUBJID', 'EGDTC', 'EGTEST', 'EGORRES', 'EGORRESU'}
+        missing_columns = sorted(required_columns.difference(df_eg.columns))
+        if missing_columns:
+            raise ValueError(
+                "EG data contract violation. Missing required columns: "
+                + ", ".join(missing_columns)
+            )
+
+        df_eg = df_eg.copy()
+        df_eg['_parsed_date'] = df_eg['EGDTC'].apply(parse_cdisc_date)
+        df_eg['_numeric_result'] = df_eg.apply(
+            lambda row: first_numeric_value(row, 'EGSTRESN', 'EGORRES'), axis=1
+        )
+
+        invalid_dates = int(df_eg['_parsed_date'].isna().sum())
+        invalid_results = int(df_eg['_numeric_result'].isna().sum())
+        if invalid_dates or invalid_results:
+            raise ValueError(
+                "EG data contract violation. "
+                f"Unparseable dates: {invalid_dates}; non-numeric results: {invalid_results}."
+            )
         
         for _, row in df_eg.iterrows():
-            obs_date = pd.to_datetime(row.get('EGDTC'), errors='coerce')
+            obs_date = row['_parsed_date']
             
             measurement_records.append({
                 'measurement_id': measurement_id_counter,
@@ -86,7 +108,7 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'measurement_type_concept_id': 32838, 
                 'measurement_date': obs_date.date() if pd.notna(obs_date) else np.nan,
                 'measurement_datetime': obs_date if pd.notna(obs_date) else pd.NaT,
-                'value_as_number': row.get('EGSTRESN') if 'EGSTRESN' in row else np.nan,
+                'value_as_number': row['_numeric_result'],
                 'value_source_value': row.get('EGORRES'),
                 'unit_source_value': row.get('EGORRESU'),
                 'measurement_source_value': row.get('EGTEST'),

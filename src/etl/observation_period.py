@@ -7,7 +7,7 @@ from pathlib import Path
 # Setup paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
-from src.utils.helpers import generate_person_id
+from src.utils.helpers import generate_person_id, parse_cdisc_date
 
 def run_observation_period_etl():
     print("⏳ Calculating OBSERVATION_PERIOD...")
@@ -50,7 +50,7 @@ def run_observation_period_etl():
                 
     if event_dates:
         df_events = pd.concat(event_dates, ignore_index=True)
-        df_events['date'] = pd.to_datetime(df_events['date'], errors='coerce')
+        df_events['date'] = df_events['date'].apply(parse_cdisc_date)
         df_events = df_events.dropna(subset=['date'])
         
         # Get min and max active date per person
