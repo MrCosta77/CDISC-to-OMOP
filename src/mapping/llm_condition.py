@@ -9,7 +9,7 @@ from pathlib import Path
 # Setup paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
-from src.utils.config import DB_PATH, MODEL_NAME
+from src.utils.config import CONFIDENCE_THRESHOLD, DB_PATH, MODEL_NAME
 from src.mapping.llm_shared import get_candidates_from_db_safe, calculate_confidence_score
 
 
@@ -141,8 +141,11 @@ def run_llm_condition_mapping():
                 # Fetch the exact name the LLM picked to calculate the score
                 chosen_name = con.execute("SELECT concept_name FROM concept WHERE concept_id = ?", [chosen_id]).fetchone()[0]
                 
-                # THE FIX: Real Math instead of fake '0.9'
                 real_score = calculate_confidence_score(term, chosen_name)
+                
+                if real_score < CONFIDENCE_THRESHOLD:
+                    chosen_id = 0
+                    real_score = 0.0
                 
                 con.execute("""
                     INSERT INTO mapping_provenance (
