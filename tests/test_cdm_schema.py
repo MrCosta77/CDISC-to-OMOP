@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import duckdb
 import pytest
 
@@ -10,6 +12,21 @@ from src.omop.cdm54 import (
     verify_specification,
 )
 from src.utils.setup_cdm_schema import setup_cdm_schema
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SPEC_GIT_PATH = "resources/omop_cdm_v5_4/OMOP_CDMv5.4_Field_Level.csv"
+
+
+def test_pinned_specification_is_exempt_from_git_eol_normalization():
+    attributes = {
+        line.strip()
+        for line in (PROJECT_ROOT / ".gitattributes").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    assert f"{SPEC_GIT_PATH} binary" in attributes
 
 
 def test_pinned_ohdsi_specification_has_expected_dimensions():

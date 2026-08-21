@@ -120,5 +120,7 @@ commit `746a15e0fb36a95ba6cc0993737f1273bbad92f2`. The vendored field
 specification is the OHDSI source of truth used to generate the DDL and is
 verified at runtime with SHA-256
 `2b763c7a2aeb309372c1564350939551531318e2078fd4443e03b2741e79b77c`.
+The file is exempt from Git end-of-line normalization so the official byte
+stream and its checksum remain identical on Windows and Unix checkouts.
 Logical OMOP `integer` fields are represented as DuckDB `BIGINT` so generated
 64-bit identifiers remain valid.
