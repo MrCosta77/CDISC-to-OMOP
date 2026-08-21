@@ -1,48 +1,85 @@
+"""Link OMOP events to actual SV visits without inventing encounters."""
+
+from pathlib import Path
+
 import pandas as pd
-import os
-import sys
 
-# Add the src directory to the python path to import utils
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-def run_visit_linking():
-    print("🔗 Linking clinical events to their respective visits...")
-    
-    processed_dir = os.path.join("data", "processed")
-    
-    try:
-        df_visit = pd.read_csv(os.path.join(processed_dir, "VISIT_OCCURRENCE.csv"))
-        df_cond = pd.read_csv(os.path.join(processed_dir, "CONDITION_OCCURRENCE.csv"))
-        df_drug = pd.read_csv(os.path.join(processed_dir, "DRUG_EXPOSURE.csv"))
-        df_meas = pd.read_csv(os.path.join(processed_dir, "MEASUREMENT.csv"))
-    except FileNotFoundError as e:
-        print(f"❌ Error loading files for linking: {e}")
-        print("Make sure to run the visit derivation script first.")
-        return
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
-    # 1. Create a lookup dictionary: (person_id, date) -> visit_occurrence_id
-    print("🧠 Building mapping dictionary...")
-    visit_mapping = df_visit.set_index(['person_id', 'visit_start_date'])['visit_occurrence_id'].to_dict()
 
-    # 2. Link Conditions
-    print("   - Updating CONDITION_OCCURRENCE...")
-    df_cond['visit_occurrence_id'] = df_cond.set_index(['person_id', 'condition_start_date']).index.map(visit_mapping)
-    df_cond['visit_occurrence_id'] = df_cond['visit_occurrence_id'].astype('Int64')
-    df_cond.to_csv(os.path.join(processed_dir, "CONDITION_OCCURRENCE.csv"), index=False)
+def _link_domain(events, visits, event_date_column):
+    result = events.copy()
+    result["visit_occurrence_id"] = pd.Series(pd.NA, index=result.index, dtype="Int64")
+    visit_lookup = {
+        (int(row.person_id), float(row.source_visit_num)): int(row.visit_occurrence_id)
+        for row in visits.itertuples()
+    }
 
-    # 3. Link Drugs
-    print("   - Updating DRUG_EXPOSURE...")
-    df_drug['visit_occurrence_id'] = df_drug.set_index(['person_id', 'drug_exposure_start_date']).index.map(visit_mapping)
-    df_drug['visit_occurrence_id'] = df_drug['visit_occurrence_id'].astype('Int64')
-    df_drug.to_csv(os.path.join(processed_dir, "DRUG_EXPOSURE.csv"), index=False)
+    if "source_visit_num" in result.columns:
+        visit_numbers = pd.to_numeric(result["source_visit_num"], errors="coerce")
+        for index in result.index[visit_numbers.notna()]:
+            person_id = result.at[index, "person_id"]
+            if pd.notna(person_id):
+                result.at[index, "visit_occurrence_id"] = visit_lookup.get(
+                    (int(person_id), float(visit_numbers.at[index])), pd.NA
+                )
 
-    # 4. Link Measurements
-    print("   - Updating MEASUREMENT...")
-    df_meas['visit_occurrence_id'] = df_meas.set_index(['person_id', 'measurement_date']).index.map(visit_mapping)
-    df_meas['visit_occurrence_id'] = df_meas['visit_occurrence_id'].astype('Int64')
-    df_meas.to_csv(os.path.join(processed_dir, "MEASUREMENT.csv"), index=False)
+    event_dates = pd.to_datetime(result[event_date_column], errors="coerce")
+    visit_starts = pd.to_datetime(visits["visit_start_date"], errors="raise")
+    visit_ends = pd.to_datetime(visits["visit_end_date"], errors="raise")
+    for index in result.index[result["visit_occurrence_id"].isna()]:
+        if "source_visit_num" in result.columns and pd.notna(
+            pd.to_numeric(pd.Series([result.at[index, "source_visit_num"]]), errors="coerce").iloc[0]
+        ):
+            continue
+        person_id, event_date = result.at[index, "person_id"], event_dates.at[index]
+        if pd.isna(person_id) or pd.isna(event_date):
+            continue
+        matches = visits.loc[
+            (visits["person_id"] == person_id)
+            & (visit_starts <= event_date)
+            & (visit_ends >= event_date),
+            "visit_occurrence_id",
+        ]
+        if len(matches) > 1:
+            raise ValueError(
+                f"Ambiguous visit link for person_id={person_id}, date={event_date.date()}."
+            )
+        if len(matches) == 1:
+            result.at[index, "visit_occurrence_id"] = int(matches.iloc[0])
 
-    print("✅ All clinical domains successfully linked to visits!")
+    result["visit_occurrence_id"] = result["visit_occurrence_id"].astype("Int64")
+    return result
+
+
+def run_visit_linking(processed_dir=None):
+    print("🔗 Linking clinical events to actual SV visits...")
+    processed_dir = Path(processed_dir or PROJECT_ROOT / "data" / "processed")
+    visits = pd.read_csv(processed_dir / "VISIT_OCCURRENCE.csv")
+    required = {
+        "visit_occurrence_id", "person_id", "visit_start_date", "visit_end_date",
+        "source_visit_num",
+    }
+    missing = sorted(required.difference(visits.columns))
+    if missing:
+        raise ValueError("Visit-link contract violation. Missing columns: " + ", ".join(missing))
+    if visits.duplicated(["person_id", "source_visit_num"]).any():
+        raise ValueError("Visit-link contract violation: duplicate subject/visit numbers.")
+
+    specifications = {
+        "CONDITION_OCCURRENCE.csv": "condition_start_date",
+        "DRUG_EXPOSURE.csv": "drug_exposure_start_date",
+        "MEASUREMENT.csv": "measurement_date",
+    }
+    linked = {}
+    for filename, date_column in specifications.items():
+        events = pd.read_csv(processed_dir / filename)
+        linked[filename] = _link_domain(events, visits, date_column)
+
+    for filename, events in linked.items():
+        events.to_csv(processed_dir / filename, index=False)
+    print("✅ Clinical domains linked where an unambiguous actual visit exists.")
 
 if __name__ == "__main__":
     run_visit_linking()

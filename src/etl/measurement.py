@@ -39,7 +39,9 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'value_source_value': row.get('LBORRES'),
                 'unit_source_value': row.get('LBORRESU'),
                 'measurement_source_value': row.get('LBTEST'),
-                'measurement_source_domain': 'LB' # Custom traceability
+                'measurement_source_domain': 'LB', # Custom traceability
+                'source_visit': row.get('VISIT'),
+                'source_visit_num': row.get('VISITNUM')
             })
             measurement_id_counter += 1
     except FileNotFoundError:
@@ -68,7 +70,9 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'value_source_value': row.get('VSORRES'),
                 'unit_source_value': row.get('VSORRESU'),
                 'measurement_source_value': row.get('VSTEST'),
-                'measurement_source_domain': 'VS'
+                'measurement_source_domain': 'VS',
+                'source_visit': row.get('VISIT'),
+                'source_visit_num': row.get('VISITNUM')
             })
             measurement_id_counter += 1
     except FileNotFoundError:
@@ -119,7 +123,9 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'value_source_value': row.get('EGORRES'),
                 'unit_source_value': row.get('EGORRESU'),
                 'measurement_source_value': row.get('EGTEST'),
-                'measurement_source_domain': 'EG'
+                'measurement_source_domain': 'EG',
+                'source_visit': row.get('VISIT'),
+                'source_visit_num': row.get('VISITNUM')
             })
             measurement_id_counter += 1
     except FileNotFoundError:

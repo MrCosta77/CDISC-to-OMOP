@@ -77,17 +77,17 @@ TYPE_CONCEPT_ASSIGNMENTS = (
     ),
     TypeConceptAssignment(
         "visit_occurrence",
-        "DERIVED",
-        STANDARD_ALGORITHM,
-        "Standard algorithm",
-        "Visits are derived deterministically from distinct event dates.",
+        "SV",
+        CASE_REPORT_FORM,
+        "Case Report Form",
+        "Actual subject visits are collected for the trial and tabulated in SDTM SV.",
     ),
     TypeConceptAssignment(
         "observation_period",
         "DERIVED",
         STANDARD_ALGORITHM,
         "Standard algorithm",
-        "Observation periods are derived from DM reference dates or active events.",
+        "Observation periods are derived deterministically from the DM reference period.",
     ),
 )
 

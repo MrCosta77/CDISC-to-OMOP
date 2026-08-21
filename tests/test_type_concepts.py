@@ -19,9 +19,9 @@ DIRECT_SOURCES = {
     ("measurement", "LB"),
     ("measurement", "VS"),
     ("measurement", "EG"),
+    ("visit_occurrence", "SV"),
 }
 DERIVED_SOURCES = {
-    ("visit_occurrence", "DERIVED"),
     ("observation_period", "DERIVED"),
 }
 

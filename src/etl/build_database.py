@@ -271,6 +271,22 @@ def _validate_candidates(con, candidates):
     _require_valid_date_range(
         con, visit, "visit_start_date", "visit_end_date"
     )
+    visits_outside_period = con.execute(f"""
+        SELECT COUNT(*)
+        FROM {quote_identifier(visit)} v
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM {quote_identifier(candidates['observation_period'])} o
+            WHERE o.person_id = v.person_id
+              AND v.visit_start_date >= o.observation_period_start_date
+              AND v.visit_end_date <= o.observation_period_end_date
+        )
+    """).fetchone()[0]
+    if visits_outside_period:
+        raise ValueError(
+            "Temporal validation failed: "
+            f"{visits_outside_period} visits fall outside the observation period."
+        )
     _require_valid_date_range(
         con,
         candidates["condition_occurrence"],

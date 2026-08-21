@@ -75,7 +75,7 @@ def main():
             ("src/etl/drug.py", "3. Extract Medications (EX + CM)"),
             ("src/etl/measurement.py", "4. Extract Measurements (LB + VS + EG)"),
             ("src/etl/observation_period.py", "5. Calculate Observation Periods"),
-            ("src/etl/visit.py", "6. Derive Visits from Events"),
+            ("src/etl/visit.py", "6. Extract Actual Visits (SV)"),
             ("src/etl/link_visits.py", "7. Link Events to Visits"),
             ("src/mapping/deterministic_mapping.py", "8. Deterministic Mapping"),
             (

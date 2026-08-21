@@ -172,6 +172,23 @@ def test_required_omop_value_is_not_silently_published(tmp_path):
         )
 
 
+def test_visit_outside_observation_period_aborts_publication(tmp_path):
+    processed_dir = tmp_path / "processed"
+    processed_dir.mkdir()
+    _write_valid_outputs(processed_dir)
+    visit_path = processed_dir / "VISIT_OCCURRENCE.csv"
+    visit = pd.read_csv(visit_path)
+    visit["visit_start_date"] = "2023-02-01"
+    visit["visit_end_date"] = "2023-02-01"
+    visit.to_csv(visit_path, index=False)
+
+    with pytest.raises(ValueError, match="visits fall outside"):
+        build_omop_database(
+            db_path=tmp_path / "omop.duckdb",
+            processed_dir=processed_dir,
+        )
+
+
 @pytest.mark.parametrize(
     ("concept_id", "standard_concept", "valid_end_date"),
     [

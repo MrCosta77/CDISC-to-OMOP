@@ -13,7 +13,7 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
 * **Hybrid Semantic Mapping with Guardrails:** Combines deterministic matching through official OHDSI `Maps To` relationships with local LLM candidate proposals. LLM proposals never update clinical tables directly.
 * **Human Review Gate:** AI proposals are stored in `mapping_decision`, linked to affected events, and must be explicitly approved before entering `approved_mapping_set`. Only approved mappings are applied on a subsequent run and recorded in `mapping_provenance`.
 * **Pinned OMOP Schema:** Installs all 39 tables from the OHDSI CDM v5.4.3 field specification. Populated tables use explicit DuckDB types, required fields, primary keys, staging tables, and relational acceptance checks.
-* **Explicit Trial Provenance:** Clinical SDTM records use the Standard `Case Report Form` Type Concept, while visits and observation periods created by ETL use `Standard algorithm`; the source-to-type matrix is centralized and tested.
+* **Explicit Trial Provenance:** Clinical SDTM records, including actual visits from SV, use the Standard `Case Report Form` Type Concept. Observation periods derived from the DM reference period use `Standard algorithm`; the source-to-type matrix is centralized and tested.
 * **Clinical Time Rigor:** Derives unbiased `OBSERVATION_PERIOD` spans using strict CDISC Demographics reference dates (`RFSTDTC`/`RFENDTC`), preventing longitudinal biases from past medical history events.
 * **Software Engineering Best Practices:**
   * Parameterized SQL queries to prevent SQL injection.
@@ -42,7 +42,7 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
 ## 🛠️ Pipeline Execution Flow
 
 1. **Phase 1: Schema, Vocabularies & Audit Setup** — Installs the pinned 39-table OMOP CDM v5.4.3 contract, loads typed vocabularies, and builds audit metadata.
-2. **Phase 2: Structural ETL** — Transforms raw CDISC domains (DM, AE, MH, EX, CM, LB, VS, EG) into OMOP clinical tables, calculates observation spans, derives visits, and links foreign keys.
+2. **Phase 2: Structural ETL** — Transforms raw CDISC domains (DM, AE, MH, EX, CM, LB, VS, EG, SV, DS) into OMOP clinical tables. Observation periods come from DM, actual visits come from SV, and event links are added only when the visit is explicit or temporally unambiguous.
 3. **Phase 3: Semantic Mapping** — Applies deterministic mappings and previously approved human mappings. The LLM only proposes candidates for the remaining orphan terms; pending proposals stay as concept ID `0` in the published clinical tables.
 4. **Phase 4: Validated Publication** — Loads CSV outputs into temporary staging tables, casts them into the official contract, validates required fields, keys, dates, concepts and relations, then atomically publishes `cdisc_omop.duckdb`.
 

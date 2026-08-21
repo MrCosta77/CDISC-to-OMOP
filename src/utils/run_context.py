@@ -18,7 +18,9 @@ from src.utils.config import (
 
 
 RUN_ID_ENV = "PIPELINE_RUN_ID"
-REQUIRED_RAW_DATASETS = ("dm", "ae", "mh", "ex", "cm", "lb", "vs", "eg")
+REQUIRED_RAW_DATASETS = (
+    "dm", "ae", "mh", "ex", "cm", "lb", "vs", "eg", "sv", "ds"
+)
 CLINICAL_TABLES = (
     "person",
     "observation_period",
