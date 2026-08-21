@@ -10,8 +10,8 @@ A production-ready, end-to-end clinical data engineering pipeline demonstrating 
 
 ## 🚀 Core Architecture & Engineering Highlights
 
-* **Hybrid Semantic Mapping with Guardrails:** Combines high-performance deterministic string matching (using official OHDSI `Maps To` relationships) with a local AI Agent (RAG via Ollama). 
-* **Regulatory-Grade Auditability:** Every AI or deterministic mapping decision is logged into a custom `mapping_provenance` table. AI mappings are mathematically scored using Token Set Ratio (FuzzyWuzzy/Jaro-Winkler) and flagged as `Pending_Human_Review` to ensure Human-in-the-Loop governance.
+* **Hybrid Semantic Mapping with Guardrails:** Combines deterministic matching through official OHDSI `Maps To` relationships with local LLM candidate proposals. LLM proposals never update clinical tables directly.
+* **Human Review Gate:** AI proposals are stored in `mapping_decision`, linked to affected events, and must be explicitly approved before entering `approved_mapping_set`. Only approved mappings are applied on a subsequent run and recorded in `mapping_provenance`.
 * **Clinical Time Rigor:** Derives unbiased `OBSERVATION_PERIOD` spans using strict CDISC Demographics reference dates (`RFSTDTC`/`RFENDTC`), preventing longitudinal biases from past medical history events.
 * **Software Engineering Best Practices:**
   * Parameterized SQL queries to prevent SQL injection.
@@ -32,13 +32,13 @@ A production-ready, end-to-end clinical data engineering pipeline demonstrating 
 * `src/analytics/`: RWE analytical scripts (`rwe_queries.py`).
 * `src/utils/`: Configuration (`config.py`), central algorithms (`helpers.py`), audit setup (`setup_audit.py`), and standardized logging (`logger.py`).
 * `tests/`: Pytest suites verifying core data engineering functions.
-* `main.py`: Fully idempotent orchestrator.
+* `main.py`: Idempotent orchestrator with a unique `run_id` and run-level audit trail.
 
 ## 🛠️ Pipeline Execution Flow
 
 1. **Phase 1: Vocabularies & Audit Setup** — Initializes OHDSI standard concepts inside DuckDB and builds the `mapping_provenance` and `cdm_source` metadata tables.
 2. **Phase 2: Structural ETL** — Transforms raw CDISC domains (DM, AE, MH, EX, CM, LB, VS, EG) into OMOP clinical tables, calculates observation spans, derives visits, and links foreign keys.
-3. **Phase 3: Semantic Mapping** — Applies exact string matching followed by AI-driven semantic disambiguation for orphan records. If the AI confidence score falls below the `CONFIDENCE_THRESHOLD`, the mapping is safely rejected.
+3. **Phase 3: Semantic Mapping** — Applies deterministic mappings and previously approved human mappings. The LLM only proposes candidates for the remaining orphan terms; pending proposals stay as concept ID `0` in the published clinical tables.
 4. **Phase 4: Database Build** — Packs all processed datasets into a unified `cdisc_omop.duckdb` relational file.
 
 ## ⚙️ How to Reproduce
@@ -49,21 +49,22 @@ git clone https://github.com/MrCosta77/CDISC-to-OMOP
 cd CDISC-to-OMOP
 ```
 
-**2. Install dependencies:**
+**2. Create an isolated environment and install dependencies (Windows PowerShell):**
 ```bash
-pip install -r requirements.txt
+py -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
 ```
 
 **3. Configure the Environment:**
 Copy the example environment file and adjust if necessary (e.g., select your local LLM model and confidence threshold).
 ```bash
-cp .env.example .env
+Copy-Item .env.example .env
 ```
 
 **4. Run Unit Tests (Optional but recommended):**
 Ensure the mathematical core is intact before running the ETL.
 ```bash
-pytest -v
+.\.venv\Scripts\python -m pytest -v
 ```
 
 **5. Place your raw data:**
@@ -71,11 +72,32 @@ Ensure your source `.sas7bdat` files and OHDSI vocabularies are inside the `data
 
 **6. Run the full automated orchestrator:**
 ```bash
-python main.py
+.\.venv\Scripts\python main.py
 ```
-*(Track the execution in real-time or check `logs/pipeline.log` for the detailed audit trail).*
+Each execution receives a unique `run_id`. Its status, input manifest, Git commit,
+configuration snapshot, output counts, error (if any), and mapping provenance are
+stored in DuckDB. Track execution in real time or inspect `logs/pipeline.log`.
 
-**7. Run RWE Analytics:**
+**7. Review LLM proposals:**
+```bash
+.\.venv\Scripts\python -m src.mapping.review_mappings list --run-id latest
+```
+Inspect all active reusable approval and rejection rules:
+```powershell
+.\.venv\Scripts\python -m src.mapping.review_mappings rules
+```
+Approve a proposal (optionally replacing the proposed Concept ID):
+```powershell
+.\.venv\Scripts\python -m src.mapping.review_mappings approve 1 --reviewer "Reviewer Name" --reason "Validated against the Standard Vocabulary" --concept-id 201826
+```
+Or reject it:
+```powershell
+.\.venv\Scripts\python -m src.mapping.review_mappings reject 1 --reviewer "Reviewer Name" --reason "Candidate adds unsupported clinical specificity"
+```
+Run `main.py` again after review. The next run applies only the active mappings in
+`approved_mapping_set`.
+
+**8. Run RWE Analytics:**
 Generate cohort demographics, adverse event frequencies, and rescue medication phenotyping.
 ```bash
 python src/analytics/rwe_queries.py

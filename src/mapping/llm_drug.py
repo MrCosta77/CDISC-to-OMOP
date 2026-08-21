@@ -11,6 +11,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 from src.utils.config import DB_PATH, MODEL_NAME
 from src.mapping.llm_shared import get_candidates_from_db_safe, calculate_confidence_score
+from src.mapping.review_store import (
+    get_vocabulary_version,
+    record_mapping_decision,
+)
+from src.utils.run_context import require_run_id
 
 def ask_llm_to_pick(raw_term, candidates):
     """Prompts the local LLM to select the best matching concept ID."""
@@ -76,6 +81,7 @@ def run_llm_drug_mapping():
     print(f"💊 STARTING AI SEMANTIC MAPPING FOR DRUGS (MODEL: {MODEL_NAME})")
     print("-" * 70)
     
+    run_id = require_run_id()
     drug_path = os.path.join(PROJECT_ROOT, "data", "processed", "DRUG_EXPOSURE.csv")
     
     try:
@@ -94,78 +100,54 @@ def run_llm_drug_mapping():
         
     print(f"Found {len(orphan_terms)} orphan clinical terms. Handing over to AI...")
     
-    mapping_dict = {}
+    proposed_count = 0
+    unresolved_count = 0
     with duckdb.connect(DB_PATH) as con:
+        vocabulary_version = get_vocabulary_version(con)
         for term in orphan_terms:
             print(f"\n🔍 Processing: '{term}'")
             candidates = get_candidates_from_db_safe(term, con, 'Drug')
-            
+            chosen_id = 0
+            chosen_name = None
             if candidates:
                 print(f"   - Retrieved {len(candidates)} candidates from DuckDB. Asking LLM...")
                 chosen_id = ask_llm_to_pick(term, candidates)
                 
                 if chosen_id != 0:
                     chosen_name = next((c[1] for c in candidates if int(c[0]) == chosen_id), "Unknown")
-                    print(f"   ✅ AI Mapped: {term} ➔ {chosen_name} ({chosen_id})")
-                    mapping_dict[term] = chosen_id
+                    print(f"   📝 AI Proposed: {term} ➔ {chosen_name} ({chosen_id})")
                 else:
-                    print(f"   ⚠️ AI decided no candidates were a good match. Left as 0.")
+                    print("   ⚠️ AI proposed no valid match.")
             else:
-                print(f"   ⚠️ DuckDB found no keyword candidates. Left as 0.")
+                print("   ⚠️ DuckDB found no keyword candidates.")
 
-    # Apply the AI mappings to the dataframe
-    if mapping_dict:
-        mask = (df_drug['drug_concept_id'] == 0) & (df_drug['drug_source_value'].isin(mapping_dict.keys()))
-        
-        # 1. Grab the rows we are about to update to log them in the audit trail
-        rows_to_audit = df_drug[mask][['drug_exposure_id', 'drug_source_value']]
-        
-        # 2. Update CSV
-        df_drug.loc[mask, 'drug_concept_id'] = df_drug.loc[mask, 'drug_source_value'].map(mapping_dict)
-        df_drug['drug_concept_id'] = df_drug['drug_concept_id'].astype('Int64')
-        df_drug.to_csv(drug_path, index=False)
-        
-        # Write Provenance to DuckDB
-        with duckdb.connect(DB_PATH) as con:
-            try:
-                vocab_version = con.execute("SELECT vocabulary_version FROM vocabulary WHERE vocabulary_id = 'None'").fetchone()[0]
-            except duckdb.CatalogException:
-                vocab_version = 'Athena_Standard'
-                
-            for _, row in rows_to_audit.iterrows():
-                term = row['drug_source_value'] # <-- Nome da coluna corrigido
-                chosen_id = int(mapping_dict[term])
-                
-                # Fetch the exact name the LLM picked to calculate the score
-                chosen_name = con.execute("SELECT concept_name FROM concept WHERE concept_id = ?", [chosen_id]).fetchone()[0]
-                
-                real_score = calculate_confidence_score(term, chosen_name)
-                
-                con.execute("""
-                    INSERT INTO mapping_provenance (
-                        target_table, target_id, source_value, normalized_value,
-                        assigned_concept_id, mapping_method, score, model_name,
-                        vocabulary_version, reviewed_by
-                    ) VALUES (
-                        'drug_exposure', ?, ?, ?, ?, 'llm_zero_shot', ?, ?, ?, 'Pending_Human_Review'
-                    )
-                """, (
-                    int(row['drug_exposure_id']), # <-- ID corrigido
-                    term, 
-                    term, 
-                    chosen_id, 
-                    real_score, 
-                    MODEL_NAME, 
-                    vocab_version
-                ))
-                
-        print("\n" + "-" * 70)
-        print(f"💾 File updated: DRUG_EXPOSURE.csv")
-        print("✅ Provenance Audit successfully updated in DuckDB!")
-        print(f"🏆 AI successfully resolved {len(mapping_dict)} out of {len(orphan_terms)} orphan drugs!")
-    else:
-        print("\n" + "-" * 70)
-        print("📉 AI could not confidently map any of the orphan terms.")
+            affected_ids = df_drug.loc[
+                unmapped_mask & (df_drug['drug_source_value'] == term),
+                'drug_exposure_id',
+            ].tolist()
+            score = calculate_confidence_score(term, chosen_name) if chosen_id else 0.0
+            record_mapping_decision(
+                con,
+                run_id=run_id,
+                target_table="drug_exposure",
+                source_value=term,
+                proposed_concept_id=chosen_id,
+                score=score,
+                model_name=MODEL_NAME,
+                vocabulary_version=vocabulary_version,
+                affected_target_ids=affected_ids,
+            )
+            if chosen_id:
+                proposed_count += 1
+            else:
+                unresolved_count += 1
+
+    print("\n" + "-" * 70)
+    print(
+        f"📝 Stored {proposed_count} proposals and {unresolved_count} unresolved "
+        "terms for human review."
+    )
+    print("🔒 No pending LLM proposal was applied to DRUG_EXPOSURE.csv.")
 
 if __name__ == "__main__":
     run_llm_drug_mapping()

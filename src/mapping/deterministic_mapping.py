@@ -8,6 +8,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 from src.utils.config import DB_PATH
+from src.utils.run_context import require_run_id
 
 def get_standard_concept(term, domain, con):
     """
@@ -48,7 +49,9 @@ def get_standard_concept(term, domain, con):
         
     return 0, None, None
 
-def process_domain(df, source_col, concept_col, id_col, domain_name, target_table, con):
+def process_domain(
+    df, source_col, concept_col, id_col, domain_name, target_table, con, run_id
+):
     unmapped_mask = df[concept_col] == 0
     unique_terms = df[unmapped_mask][source_col].dropna().unique()
     
@@ -73,7 +76,8 @@ def process_domain(df, source_col, concept_col, id_col, domain_name, target_tabl
             for record_id in affected_ids:
                 audit_records.append((
                     target_table, int(record_id), term, term, int(concept_id), 
-                    method, 1.0, 'OHDSI_Vocabulary', vocab_version, 'System_Auto_Approved'
+                    method, 1.0, 'OHDSI_Vocabulary', vocab_version,
+                    'System_Auto_Approved', run_id
                 ))
 
     # Apply mappings
@@ -94,8 +98,9 @@ def process_domain(df, source_col, concept_col, id_col, domain_name, target_tabl
                 INSERT INTO mapping_provenance (
                     target_table, target_id, source_value, normalized_value,
                     assigned_concept_id, mapping_method, score, model_name,
-                    vocabulary_version, reviewed_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    vocabulary_version, reviewed_by, run_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT DO NOTHING
             """, audit_records)
             
     print(f"[{domain_name}] Successfully mapped {len(mapping_dict)} out of {len(unique_terms)} unique terms deterministically.")
@@ -105,6 +110,7 @@ def run_deterministic_mapping():
     print("⚙️ STARTING DETERMINISTIC MAPPING (OHDSI 'MAPS TO' RELATIONSHIPS)")
     print("-" * 50)
     
+    run_id = require_run_id()
     cond_path = os.path.join(PROJECT_ROOT, "data", "processed", "CONDITION_OCCURRENCE.csv")
     drug_path = os.path.join(PROJECT_ROOT, "data", "processed", "DRUG_EXPOSURE.csv")
     meas_path = os.path.join(PROJECT_ROOT, "data", "processed", "MEASUREMENT.csv") 
@@ -116,7 +122,7 @@ def run_deterministic_mapping():
             df_cond = pd.read_csv(cond_path)
             df_cond, mapped_c = process_domain(
                 df_cond, 'condition_source_value', 'condition_concept_id', 'condition_occurrence_id',
-                'Condition', 'condition_occurrence', con
+                'Condition', 'condition_occurrence', con, run_id
             )
             if mapped_c > 0:
                 df_cond.to_csv(cond_path, index=False)
@@ -127,7 +133,7 @@ def run_deterministic_mapping():
             df_drug = pd.read_csv(drug_path)
             df_drug, mapped_d = process_domain(
                 df_drug, 'drug_source_value', 'drug_concept_id', 'drug_exposure_id',
-                'Drug', 'drug_exposure', con
+                'Drug', 'drug_exposure', con, run_id
             )
             if mapped_d > 0:
                 df_drug.to_csv(drug_path, index=False)
@@ -138,7 +144,7 @@ def run_deterministic_mapping():
             df_meas = pd.read_csv(meas_path)
             df_meas, mapped_m = process_domain(
                 df_meas, 'measurement_source_value', 'measurement_concept_id', 'measurement_id',
-                'Measurement', 'measurement', con
+                'Measurement', 'measurement', con, run_id
             )
             if mapped_m > 0:
                 df_meas.to_csv(meas_path, index=False)

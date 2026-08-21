@@ -9,32 +9,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
 from src.utils.config import DB_PATH
+from src.utils.run_context import ensure_audit_schema
 
 def setup_audit_tables():
     print("⚙️ STARTING AUDIT & METADATA SETUP")
     print("-" * 50)
     
     with duckdb.connect(DB_PATH) as con:
-        # 1. CRIAR A SEQUÊNCIA PRIMEIRO (Evita o erro do "ovo e da galinha")
-        con.execute("CREATE SEQUENCE IF NOT EXISTS seq_provenance_id START 1")
-        
-        # 2. TABELA DE PROVENIÊNCIA (Audit Trail)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS mapping_provenance (
-                provenance_id BIGINT PRIMARY KEY DEFAULT nextval('seq_provenance_id'),
-                target_table VARCHAR NOT NULL,
-                target_id BIGINT NOT NULL,
-                source_value VARCHAR,
-                normalized_value VARCHAR,
-                assigned_concept_id INTEGER NOT NULL,
-                mapping_method VARCHAR NOT NULL,
-                score DOUBLE NOT NULL,
-                model_name VARCHAR,
-                vocabulary_version VARCHAR,
-                reviewed_by VARCHAR DEFAULT 'Pending_Human_Review',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+        ensure_audit_schema(con)
         print("✅ 'mapping_provenance' table verified/created successfully!")
 
         # 3. TABELA CDM_SOURCE (Metadados OHDSI)

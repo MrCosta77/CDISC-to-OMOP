@@ -5,7 +5,7 @@ import os
 
 # Add the src directory to the python path to import utils
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from src.utils.helpers import generate_person_id
+from src.utils.helpers import generate_person_id, parse_cdisc_date
 
 def run_etl_condition(ae_path, mh_path, output_path):
     """
@@ -23,8 +23,8 @@ def run_etl_condition(ae_path, mh_path, output_path):
         df_ae = pd.read_sas(ae_path, format="sas7bdat", encoding="utf-8")
         
         for _, row in df_ae.iterrows():
-            start_date = pd.to_datetime(row.get('AESTDTC'), errors='coerce')
-            end_date = pd.to_datetime(row.get('AEENDTC'), errors='coerce')
+            start_date = parse_cdisc_date(row.get('AESTDTC'))
+            end_date = parse_cdisc_date(row.get('AEENDTC'))
             
             # Prioritize AETERM, fallback to AEDECOD if empty
             source_value = row.get('AETERM')
@@ -54,10 +54,28 @@ def run_etl_condition(ae_path, mh_path, output_path):
     print(f"🩺 Reading CDISC Medical History from: {mh_path}")
     try:
         df_mh = pd.read_sas(mh_path, format="sas7bdat", encoding="utf-8")
+
+        required_columns = {'USUBJID', 'MHTERM', 'MHSTDTC'}
+        missing_columns = sorted(required_columns.difference(df_mh.columns))
+        if missing_columns:
+            raise ValueError(
+                "MH data contract violation. Missing required columns: "
+                + ", ".join(missing_columns)
+            )
+
+        df_mh = df_mh.copy()
+        df_mh['_parsed_date'] = df_mh['MHSTDTC'].apply(parse_cdisc_date)
+        invalid_dates = int(df_mh['_parsed_date'].isna().sum())
+        missing_terms = int(df_mh['MHTERM'].isna().sum())
+        if invalid_dates or missing_terms:
+            raise ValueError(
+                "MH data contract violation. "
+                f"Unparseable dates: {invalid_dates}; missing terms: {missing_terms}."
+            )
         
         for _, row in df_mh.iterrows():
             # In SDTM, MH diagnosis dates are usually captured in MHSTDTC
-            start_date = pd.to_datetime(row.get('MHSTDTC'), errors='coerce')
+            start_date = row['_parsed_date']
             
             condition_records.append({
                 'condition_occurrence_id': condition_id_counter,

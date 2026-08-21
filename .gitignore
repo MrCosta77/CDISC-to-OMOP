@@ -2,20 +2,39 @@
 data/raw/*
 data/processed/*
 data/omop_vocab/
+
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+
 *.sas7bdat
 *.csv
 *.duckdb
+*.duckdb.wal
 
-# Python and Jupyter
+# Python
 __pycache__/
 *.py[cod]
-.ipynb_checkpoints
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Environments
+# Jupyter
+.ipynb_checkpoints/
+
+# Environments and secrets
+.venv/
+venv/
+env/
 .env
+.env.*
+!.env.example
 
 # Logs
 logs/
 *.log
+
+# Operating system
+.DS_Store
+Thumbs.db
