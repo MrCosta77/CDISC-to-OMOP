@@ -47,7 +47,7 @@ def _load_active_approvals(con, target_table, expected_domain):
         JOIN mapping_decision d
           ON d.mapping_decision_id = a.source_decision_id
         LEFT JOIN concept c
-          ON c.concept_id = CAST(a.concept_id AS VARCHAR)
+          ON CAST(c.concept_id AS BIGINT) = a.concept_id
         WHERE a.target_table = ? AND a.active = TRUE
         ORDER BY a.normalized_value
     """, [target_table]).fetchall()

@@ -52,9 +52,9 @@ def list_decisions(con, run_id):
                COUNT(e.target_id) AS affected_events
         FROM mapping_decision d
         LEFT JOIN concept proposed
-          ON proposed.concept_id = CAST(d.proposed_concept_id AS VARCHAR)
+          ON CAST(proposed.concept_id AS BIGINT) = d.proposed_concept_id
         LEFT JOIN concept selected
-          ON selected.concept_id = CAST(d.selected_concept_id AS VARCHAR)
+          ON CAST(selected.concept_id AS BIGINT) = d.selected_concept_id
         LEFT JOIN mapping_decision_event e
           ON e.mapping_decision_id = d.mapping_decision_id
         WHERE d.run_id = ?
@@ -101,7 +101,7 @@ def list_rules(con):
                c.concept_name, a.approved_by, a.approved_at,
                a.source_decision_id
         FROM approved_mapping_set a
-        LEFT JOIN concept c ON c.concept_id = CAST(a.concept_id AS VARCHAR)
+        LEFT JOIN concept c ON CAST(c.concept_id AS BIGINT) = a.concept_id
         WHERE a.active
         ORDER BY a.target_table, a.source_value
     """).fetchall()

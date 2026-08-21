@@ -67,6 +67,7 @@ def main():
         validate_required_inputs()
 
         steps = [
+            ("src/utils/setup_cdm_schema.py", "0. Install OMOP CDM 5.4 Schema"),
             ("src/utils/setup_vocab.py", "0. Setup OMOP Vocabularies"),
             ("src/utils/setup_audit.py", "0b. Setup Audit and Provenance"),
             ("src/etl/person.py", "1. Extract Demographics (DM)"),

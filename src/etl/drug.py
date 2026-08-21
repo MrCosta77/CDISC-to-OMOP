@@ -25,6 +25,7 @@ def run_drug_etl(ex_path, cm_path, output_path):
         for _, row in df_ex.iterrows():
             start_date = pd.to_datetime(row.get('EXSTDTC'), errors='coerce')
             end_date = pd.to_datetime(row.get('EXENDTC'), errors='coerce')
+            published_end_date = end_date if pd.notna(end_date) else start_date
             
             drug_records.append({
                 'drug_exposure_id': drug_id_counter,
@@ -33,8 +34,8 @@ def run_drug_etl(ex_path, cm_path, output_path):
                 'drug_type_concept_id': 32838, # OMOP standard for "Clinical Study Observation"
                 'drug_exposure_start_date': start_date.date() if pd.notna(start_date) else np.nan,
                 'drug_exposure_start_datetime': start_date if pd.notna(start_date) else pd.NaT,
-                'drug_exposure_end_date': end_date.date() if pd.notna(end_date) else np.nan,
-                'drug_exposure_end_datetime': end_date if pd.notna(end_date) else pd.NaT,
+                'drug_exposure_end_date': published_end_date.date() if pd.notna(published_end_date) else np.nan,
+                'drug_exposure_end_datetime': published_end_date if pd.notna(published_end_date) else pd.NaT,
                 'quantity': row.get('EXDOSE') if 'EXDOSE' in row else np.nan,
                 'dose_unit_source_value': row.get('EXDOSU') if 'EXDOSU' in row else None,
                 'route_source_value': row.get('EXROUTE') if 'EXROUTE' in row else None,
@@ -56,6 +57,7 @@ def run_drug_etl(ex_path, cm_path, output_path):
         for _, row in df_cm.iterrows():
             start_date = pd.to_datetime(row.get('CMSTDTC'), errors='coerce')
             end_date = pd.to_datetime(row.get('CMENDTC'), errors='coerce')
+            published_end_date = end_date if pd.notna(end_date) else start_date
             
             drug_records.append({
                 'drug_exposure_id': drug_id_counter,
@@ -64,8 +66,8 @@ def run_drug_etl(ex_path, cm_path, output_path):
                 'drug_type_concept_id': 32817, # OMOP standard for "EHR"
                 'drug_exposure_start_date': start_date.date() if pd.notna(start_date) else np.nan,
                 'drug_exposure_start_datetime': start_date if pd.notna(start_date) else pd.NaT,
-                'drug_exposure_end_date': end_date.date() if pd.notna(end_date) else np.nan,
-                'drug_exposure_end_datetime': end_date if pd.notna(end_date) else pd.NaT,
+                'drug_exposure_end_date': published_end_date.date() if pd.notna(published_end_date) else np.nan,
+                'drug_exposure_end_datetime': published_end_date if pd.notna(published_end_date) else pd.NaT,
                 'quantity': row.get('CMDOSE') if 'CMDOSE' in row else np.nan,
                 'dose_unit_source_value': row.get('CMDOSU') if 'CMDOSU' in row else None, 
                 'route_source_value': row.get('CMROUTE') if 'CMROUTE' in row else None,

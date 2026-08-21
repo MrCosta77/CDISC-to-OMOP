@@ -11,6 +11,9 @@ data/omop_vocab/
 *.duckdb
 *.duckdb.wal
 
+# Pinned OHDSI schema metadata is source code, not generated clinical data.
+!resources/omop_cdm_v5_4/OMOP_CDMv5.4_Field_Level.csv
+
 # Python
 __pycache__/
 *.py[cod]
