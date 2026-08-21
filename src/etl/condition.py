@@ -6,6 +6,7 @@ import os
 # Add the src directory to the python path to import utils
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.utils.helpers import generate_person_id, parse_cdisc_date
+from src.omop.type_concepts import type_concept_id_for
 
 def run_etl_condition(ae_path, mh_path, output_path):
     """
@@ -35,7 +36,9 @@ def run_etl_condition(ae_path, mh_path, output_path):
                 'condition_occurrence_id': condition_id_counter,
                 'person_id': generate_person_id(row.get('USUBJID')),
                 'condition_concept_id': 0, # Pending AI Mapping
-                'condition_type_concept_id': 32020, # OMOP standard for "EHR encounter diagnosis"
+                'condition_type_concept_id': type_concept_id_for(
+                    'condition_occurrence', 'AE'
+                ),
                 'condition_start_date': start_date.date() if pd.notna(start_date) else np.nan,
                 'condition_start_datetime': start_date if pd.notna(start_date) else pd.NaT,
                 'condition_end_date': end_date.date() if pd.notna(end_date) else np.nan,
@@ -81,7 +84,9 @@ def run_etl_condition(ae_path, mh_path, output_path):
                 'condition_occurrence_id': condition_id_counter,
                 'person_id': generate_person_id(row.get('USUBJID')),
                 'condition_concept_id': 0, # Pending AI Mapping
-                'condition_type_concept_id': 32817, # OMOP standard for "EHR" (General medical history)
+                'condition_type_concept_id': type_concept_id_for(
+                    'condition_occurrence', 'MH'
+                ),
                 'condition_start_date': start_date.date() if pd.notna(start_date) else np.nan,
                 'condition_start_datetime': start_date if pd.notna(start_date) else pd.NaT,
                 # Chronic Medical History usually lacks an explicit end date in base SDTM

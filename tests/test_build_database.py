@@ -6,7 +6,7 @@ from src.etl.build_database import (
     build_omop_database,
     validate_published_database,
 )
-from src.omop.cdm54 import expected_columns, load_table_specs
+from src.omop.cdm54 import create_table_sql, expected_columns, load_table_specs
 
 
 PROCESSED_FILES = (
@@ -170,3 +170,42 @@ def test_required_omop_value_is_not_silently_published(tmp_path):
             db_path=tmp_path / "omop.duckdb",
             processed_dir=processed_dir,
         )
+
+
+@pytest.mark.parametrize(
+    ("concept_id", "standard_concept", "valid_end_date"),
+    [
+        (32020, None, "2099-12-31"),
+        (32809, "S", "2020-12-31"),
+    ],
+)
+def test_invalid_type_concept_aborts_publication(
+    tmp_path, concept_id, standard_concept, valid_end_date
+):
+    processed_dir = tmp_path / "processed"
+    processed_dir.mkdir()
+    _write_valid_outputs(processed_dir)
+    condition_path = processed_dir / "CONDITION_OCCURRENCE.csv"
+    condition = pd.read_csv(condition_path)
+    condition["condition_type_concept_id"] = concept_id
+    condition.to_csv(condition_path, index=False)
+
+    db_path = tmp_path / "omop.duckdb"
+    with duckdb.connect(str(db_path)) as con:
+        con.execute(create_table_sql("concept"))
+        con.execute(
+            """
+            INSERT INTO concept (
+                concept_id, concept_name, domain_id, vocabulary_id,
+                concept_class_id, standard_concept, concept_code,
+                valid_start_date, valid_end_date
+            ) VALUES (?, 'Test type', 'Type Concept', 'Type Concept',
+                      'Type Concept', ?, 'Test', '1970-01-01', ?)
+            """,
+            [concept_id, standard_concept, valid_end_date],
+        )
+
+    with pytest.raises(
+        ValueError, match="invalid or wrong-domain Standard Concepts"
+    ):
+        build_omop_database(db_path=db_path, processed_dir=processed_dir)

@@ -8,6 +8,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 from src.utils.helpers import generate_person_id, parse_cdisc_date
+from src.omop.type_concepts import type_concept_id_for
 
 def run_observation_period_etl():
     print("⏳ Calculating OBSERVATION_PERIOD...")
@@ -70,7 +71,9 @@ def run_observation_period_etl():
         'person_id': df_dm['person_id'].astype('Int64'),
         'observation_period_start_date': df_dm['start_date'].dt.date,
         'observation_period_end_date': df_dm['end_date'].dt.date,
-        'period_type_concept_id': 32817 # EHR clinical data concept
+        'period_type_concept_id': type_concept_id_for(
+            'observation_period', 'DERIVED'
+        )
     })
 
     out_path = os.path.join(PROJECT_ROOT, "data", "processed", "OBSERVATION_PERIOD.csv")

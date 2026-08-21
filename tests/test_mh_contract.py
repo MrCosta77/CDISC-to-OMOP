@@ -29,6 +29,7 @@ def test_condition_etl_recovers_legacy_mh_date(monkeypatch, tmp_path):
     assert result.loc[0, "condition_start_date"] == "2019-07-28"
     assert result.loc[0, "condition_source_value"] == "Hyperlipidemia"
     assert result.loc[0, "condition_status_source_value"] == "Medical History"
+    assert result.loc[0, "condition_type_concept_id"] == 32809
 
 
 def test_condition_etl_rejects_unparseable_mh_date(monkeypatch, tmp_path):

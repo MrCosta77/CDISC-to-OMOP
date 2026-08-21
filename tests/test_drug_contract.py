@@ -26,3 +26,4 @@ def test_missing_source_end_date_uses_start_date(monkeypatch, tmp_path):
     result = pd.read_csv(output_path)
     assert result.loc[0, "drug_exposure_start_date"] == "2023-01-10"
     assert result.loc[0, "drug_exposure_end_date"] == "2023-01-10"
+    assert result.loc[0, "drug_type_concept_id"] == 32809

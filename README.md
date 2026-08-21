@@ -13,6 +13,7 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
 * **Hybrid Semantic Mapping with Guardrails:** Combines deterministic matching through official OHDSI `Maps To` relationships with local LLM candidate proposals. LLM proposals never update clinical tables directly.
 * **Human Review Gate:** AI proposals are stored in `mapping_decision`, linked to affected events, and must be explicitly approved before entering `approved_mapping_set`. Only approved mappings are applied on a subsequent run and recorded in `mapping_provenance`.
 * **Pinned OMOP Schema:** Installs all 39 tables from the OHDSI CDM v5.4.3 field specification. Populated tables use explicit DuckDB types, required fields, primary keys, staging tables, and relational acceptance checks.
+* **Explicit Trial Provenance:** Clinical SDTM records use the Standard `Case Report Form` Type Concept, while visits and observation periods created by ETL use `Standard algorithm`; the source-to-type matrix is centralized and tested.
 * **Clinical Time Rigor:** Derives unbiased `OBSERVATION_PERIOD` spans using strict CDISC Demographics reference dates (`RFSTDTC`/`RFENDTC`), preventing longitudinal biases from past medical history events.
 * **Software Engineering Best Practices:**
   * Parameterized SQL queries to prevent SQL injection.
@@ -124,3 +125,20 @@ The file is exempt from Git end-of-line normalization so the official byte
 stream and its checksum remain identical on Windows and Unix checkouts.
 Logical OMOP `integer` fields are represented as DuckDB `BIGINT` so generated
 64-bit identifiers remain valid.
+
+## CDISC Type Concept Provenance
+
+Type Concepts describe where a CDM record came from, not the clinical meaning
+of the event. The current synthetic study uses this explicit matrix:
+
+| OMOP target | CDISC source | Type Concept | Rationale |
+|---|---|---|---|
+| `CONDITION_OCCURRENCE` | AE, MH | `32809` — Case Report Form | Direct eCRF/SDTM clinical records |
+| `DRUG_EXPOSURE` | EX, CM | `32809` — Case Report Form | Direct eCRF/SDTM medication records |
+| `MEASUREMENT` | LB, VS, EG | `32809` — Case Report Form | Current synthetic eCRF/SDTM measurement feed |
+| `VISIT_OCCURRENCE` | Derived event dates | `32880` — Standard algorithm | Constructed deterministically by the ETL |
+| `OBSERVATION_PERIOD` | DM dates or active-event fallback | `32880` — Standard algorithm | Constructed deterministically by the ETL |
+
+The assignments live in `src/omop/type_concepts.py`. A future direct central-
+laboratory feed must receive an explicit assignment (for example, `32856` —
+Lab) rather than silently inheriting the current LB assumption.

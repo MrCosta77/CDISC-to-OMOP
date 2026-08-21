@@ -4,6 +4,7 @@ import sys
 
 # Add the src directory to the python path to import utils
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from src.omop.type_concepts import type_concept_id_for
 
 def run_visit_etl():
     print("🏥 Deriving OMOP VISIT_OCCURRENCE from clinical events...")
@@ -44,7 +45,9 @@ def run_visit_etl():
     df_visits['visit_concept_id'] = 9202 # OMOP standard for "Outpatient Visit"
     df_visits['visit_start_date'] = df_visits['date'].dt.strftime('%Y-%m-%d')
     df_visits['visit_end_date'] = df_visits['date'].dt.strftime('%Y-%m-%d')
-    df_visits['visit_type_concept_id'] = 32818 # OMOP Standard for "EHR / Clinical Trial"
+    df_visits['visit_type_concept_id'] = type_concept_id_for(
+        'visit_occurrence', 'DERIVED'
+    )
     df_visits['visit_source_value'] = 'Derived from clinical event'
     
     # Reorder columns

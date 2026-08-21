@@ -19,6 +19,7 @@ from src.omop.cdm54 import (
     record_schema_manifest,
     validate_table_schema,
 )
+from src.omop.type_concepts import TYPE_CONCEPT_FIELDS
 
 
 PUBLICATION_FILES = {
@@ -38,6 +39,10 @@ DOMAIN_FIELDS = {
     ("condition_occurrence", "condition_concept_id"): "Condition",
     ("drug_exposure", "drug_concept_id"): "Drug",
     ("measurement", "measurement_concept_id"): "Measurement",
+    **{
+        (table, field): "Type Concept"
+        for table, field in TYPE_CONCEPT_FIELDS.items()
+    },
 }
 
 
@@ -182,13 +187,25 @@ def _validate_concepts(con, candidates):
     placeholders = ", ".join("?" for _ in requested_ids)
     rows = con.execute(f"""
         SELECT CAST(concept_id AS BIGINT), domain_id, standard_concept,
-               invalid_reason
+               invalid_reason,
+               CURRENT_DATE BETWEEN valid_start_date AND valid_end_date
         FROM concept
         WHERE CAST(concept_id AS BIGINT) IN ({placeholders})
     """, sorted(requested_ids)).fetchall()
     concepts = {
-        int(concept_id): (domain_id, standard_concept, invalid_reason)
-        for concept_id, domain_id, standard_concept, invalid_reason in rows
+        int(concept_id): (
+            domain_id,
+            standard_concept,
+            invalid_reason,
+            currently_valid,
+        )
+        for (
+            concept_id,
+            domain_id,
+            standard_concept,
+            invalid_reason,
+            currently_valid,
+        ) in rows
     }
     missing = sorted(requested_ids.difference(concepts))
     if missing:
@@ -213,6 +230,7 @@ def _validate_concepts(con, candidates):
             if concepts[concept_id][0] != expected_domain
             or concepts[concept_id][1] != "S"
             or concepts[concept_id][2] not in {None, ""}
+            or not concepts[concept_id][3]
         ]
         if invalid:
             raise ValueError(

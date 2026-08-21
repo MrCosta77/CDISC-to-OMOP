@@ -6,6 +6,7 @@ import os
 # Add the src directory to the python path to import utils
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.utils.helpers import first_numeric_value, generate_person_id, parse_cdisc_date
+from src.omop.type_concepts import type_concept_id_for
 
 def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
     """
@@ -29,7 +30,9 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'measurement_id': measurement_id_counter,
                 'person_id': generate_person_id(row.get('USUBJID')),
                 'measurement_concept_id': 0, # Pending AI Mapping (e.g., LOINC)
-                'measurement_type_concept_id': 32838, # OMOP standard for "Clinical Study Observation"
+                'measurement_type_concept_id': type_concept_id_for(
+                    'measurement', 'LB'
+                ),
                 'measurement_date': obs_date.date() if pd.notna(obs_date) else np.nan,
                 'measurement_datetime': obs_date if pd.notna(obs_date) else pd.NaT,
                 'value_as_number': first_numeric_value(row, 'LBSTRESN', 'LBORRES'),
@@ -56,7 +59,9 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'measurement_id': measurement_id_counter,
                 'person_id': generate_person_id(row.get('USUBJID')),
                 'measurement_concept_id': 0, 
-                'measurement_type_concept_id': 32838, 
+                'measurement_type_concept_id': type_concept_id_for(
+                    'measurement', 'VS'
+                ),
                 'measurement_date': obs_date.date() if pd.notna(obs_date) else np.nan,
                 'measurement_datetime': obs_date if pd.notna(obs_date) else pd.NaT,
                 'value_as_number': first_numeric_value(row, 'VSSTRESN', 'VSORRES'),
@@ -105,7 +110,9 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'measurement_id': measurement_id_counter,
                 'person_id': generate_person_id(row.get('USUBJID')),
                 'measurement_concept_id': 0, 
-                'measurement_type_concept_id': 32838, 
+                'measurement_type_concept_id': type_concept_id_for(
+                    'measurement', 'EG'
+                ),
                 'measurement_date': obs_date.date() if pd.notna(obs_date) else np.nan,
                 'measurement_datetime': obs_date if pd.notna(obs_date) else pd.NaT,
                 'value_as_number': row['_numeric_result'],

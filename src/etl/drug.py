@@ -6,6 +6,7 @@ import os
 # Add the src directory to the python path to import utils
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.utils.helpers import generate_person_id
+from src.omop.type_concepts import type_concept_id_for
 
 def run_drug_etl(ex_path, cm_path, output_path):
     """
@@ -31,7 +32,9 @@ def run_drug_etl(ex_path, cm_path, output_path):
                 'drug_exposure_id': drug_id_counter,
                 'person_id': generate_person_id(row.get('USUBJID')),
                 'drug_concept_id': 0, # Pending AI Mapping to RxNorm
-                'drug_type_concept_id': 32838, # OMOP standard for "Clinical Study Observation"
+                'drug_type_concept_id': type_concept_id_for(
+                    'drug_exposure', 'EX'
+                ),
                 'drug_exposure_start_date': start_date.date() if pd.notna(start_date) else np.nan,
                 'drug_exposure_start_datetime': start_date if pd.notna(start_date) else pd.NaT,
                 'drug_exposure_end_date': published_end_date.date() if pd.notna(published_end_date) else np.nan,
@@ -63,7 +66,9 @@ def run_drug_etl(ex_path, cm_path, output_path):
                 'drug_exposure_id': drug_id_counter,
                 'person_id': generate_person_id(row.get('USUBJID')),
                 'drug_concept_id': 0, # Pending AI Mapping to RxNorm
-                'drug_type_concept_id': 32817, # OMOP standard for "EHR"
+                'drug_type_concept_id': type_concept_id_for(
+                    'drug_exposure', 'CM'
+                ),
                 'drug_exposure_start_date': start_date.date() if pd.notna(start_date) else np.nan,
                 'drug_exposure_start_datetime': start_date if pd.notna(start_date) else pd.NaT,
                 'drug_exposure_end_date': published_end_date.date() if pd.notna(published_end_date) else np.nan,
