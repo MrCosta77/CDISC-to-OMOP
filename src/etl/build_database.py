@@ -39,9 +39,24 @@ DOMAIN_FIELDS = {
     ("condition_occurrence", "condition_concept_id"): "Condition",
     ("drug_exposure", "drug_concept_id"): "Drug",
     ("measurement", "measurement_concept_id"): "Measurement",
+    ("measurement", "unit_concept_id"): "Unit",
     **{
         (table, field): "Type Concept"
         for table, field in TYPE_CONCEPT_FIELDS.items()
+    },
+}
+
+# These optional OMOP fields carry source semantics and therefore must be
+# explicit in this pipeline rather than silently defaulted by publication.
+SOURCE_SEMANTIC_FIELDS = {
+    "condition_occurrence": {"condition_source_concept_id"},
+    "drug_exposure": {"drug_source_concept_id"},
+    "measurement": {
+        "measurement_source_concept_id",
+        "unit_concept_id",
+        "unit_source_concept_id",
+        "unit_source_value",
+        "value_source_value",
     },
 }
 
@@ -105,6 +120,14 @@ def _stage_into_candidate(con, table, csv_path):
         raise ValueError(
             f"{csv_path.name} is missing required OMOP fields: "
             + ", ".join(missing_required)
+        )
+    missing_semantic = sorted(
+        SOURCE_SEMANTIC_FIELDS.get(table, set()).difference(staging_columns)
+    )
+    if missing_semantic:
+        raise ValueError(
+            f"{csv_path.name} is missing explicit source-semantic fields: "
+            + ", ".join(missing_semantic)
         )
 
     candidate = f"publish_{table}"

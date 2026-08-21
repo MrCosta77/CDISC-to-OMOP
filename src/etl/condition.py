@@ -44,6 +44,7 @@ def run_etl_condition(ae_path, mh_path, output_path):
                 'condition_end_date': end_date.date() if pd.notna(end_date) else np.nan,
                 'condition_end_datetime': end_date if pd.notna(end_date) else pd.NaT,
                 'condition_source_value': source_value,
+                'condition_source_concept_id': 0,
                 'condition_status_source_value': row.get('AEOUT') # Specific AE outcome (e.g., RECOVERED)
             })
             condition_id_counter += 1
@@ -93,6 +94,7 @@ def run_etl_condition(ae_path, mh_path, output_path):
                 'condition_end_date': np.nan, 
                 'condition_end_datetime': pd.NaT,
                 'condition_source_value': row.get('MHTERM'),
+                'condition_source_concept_id': 0,
                 'condition_status_source_value': 'Medical History' # Traceability flag
             })
             condition_id_counter += 1
@@ -111,7 +113,10 @@ def run_etl_condition(ae_path, mh_path, output_path):
     df_condition = pd.DataFrame(condition_records)
 
     # Clean integers to avoid decimals on empty values
-    integer_cols = ['condition_occurrence_id', 'person_id', 'condition_concept_id', 'condition_type_concept_id']
+    integer_cols = [
+        'condition_occurrence_id', 'person_id', 'condition_concept_id',
+        'condition_type_concept_id', 'condition_source_concept_id'
+    ]
     for col in integer_cols:
         df_condition[col] = df_condition[col].astype('Int64')
 

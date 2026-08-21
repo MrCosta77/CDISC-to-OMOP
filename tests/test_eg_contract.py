@@ -49,6 +49,10 @@ def test_measurement_etl_recovers_legacy_eg_output(monkeypatch, tmp_path):
     assert result.loc[0, "value_as_number"] == 69.0
     assert result.loc[0, "measurement_source_domain"] == "EG"
     assert result.loc[0, "measurement_type_concept_id"] == 32809
+    assert result.loc[0, "unit_concept_id"] == 8541
+    assert result.loc[0, "unit_source_value"] == "beats/min"
+    assert result.loc[0, "measurement_source_concept_id"] == 0
+    assert result.loc[0, "unit_source_concept_id"] == 0
 
 
 def test_measurement_etl_rejects_unparseable_eg_date(monkeypatch, tmp_path):

@@ -7,6 +7,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.utils.helpers import first_numeric_value, generate_person_id, parse_cdisc_date
 from src.omop.type_concepts import type_concept_id_for
+from src.omop.unit_concepts import unit_concept_id_for
 
 def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
     """
@@ -26,6 +27,7 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
         for _, row in df_lb.iterrows():
             obs_date = parse_cdisc_date(row.get('LBDTC'))
             
+            source_unit = row.get('LBORRESU')
             measurement_records.append({
                 'measurement_id': measurement_id_counter,
                 'person_id': generate_person_id(row.get('USUBJID')),
@@ -37,8 +39,11 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'measurement_datetime': obs_date if pd.notna(obs_date) else pd.NaT,
                 'value_as_number': first_numeric_value(row, 'LBSTRESN', 'LBORRES'),
                 'value_source_value': row.get('LBORRES'),
-                'unit_source_value': row.get('LBORRESU'),
+                'unit_concept_id': unit_concept_id_for(source_unit),
+                'unit_source_value': source_unit,
+                'unit_source_concept_id': 0,
                 'measurement_source_value': row.get('LBTEST'),
+                'measurement_source_concept_id': 0,
                 'measurement_source_domain': 'LB', # Custom traceability
                 'source_visit': row.get('VISIT'),
                 'source_visit_num': row.get('VISITNUM')
@@ -57,6 +62,7 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
         for _, row in df_vs.iterrows():
             obs_date = parse_cdisc_date(row.get('VSDTC'))
             
+            source_unit = row.get('VSORRESU')
             measurement_records.append({
                 'measurement_id': measurement_id_counter,
                 'person_id': generate_person_id(row.get('USUBJID')),
@@ -68,8 +74,11 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'measurement_datetime': obs_date if pd.notna(obs_date) else pd.NaT,
                 'value_as_number': first_numeric_value(row, 'VSSTRESN', 'VSORRES'),
                 'value_source_value': row.get('VSORRES'),
-                'unit_source_value': row.get('VSORRESU'),
+                'unit_concept_id': unit_concept_id_for(source_unit),
+                'unit_source_value': source_unit,
+                'unit_source_concept_id': 0,
                 'measurement_source_value': row.get('VSTEST'),
+                'measurement_source_concept_id': 0,
                 'measurement_source_domain': 'VS',
                 'source_visit': row.get('VISIT'),
                 'source_visit_num': row.get('VISITNUM')
@@ -110,6 +119,7 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
         for _, row in df_eg.iterrows():
             obs_date = row['_parsed_date']
             
+            source_unit = row.get('EGORRESU')
             measurement_records.append({
                 'measurement_id': measurement_id_counter,
                 'person_id': generate_person_id(row.get('USUBJID')),
@@ -121,8 +131,11 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'measurement_datetime': obs_date if pd.notna(obs_date) else pd.NaT,
                 'value_as_number': row['_numeric_result'],
                 'value_source_value': row.get('EGORRES'),
-                'unit_source_value': row.get('EGORRESU'),
+                'unit_concept_id': unit_concept_id_for(source_unit),
+                'unit_source_value': source_unit,
+                'unit_source_concept_id': 0,
                 'measurement_source_value': row.get('EGTEST'),
+                'measurement_source_concept_id': 0,
                 'measurement_source_domain': 'EG',
                 'source_visit': row.get('VISIT'),
                 'source_visit_num': row.get('VISITNUM')
@@ -142,7 +155,11 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
     df_measurement = pd.DataFrame(measurement_records)
 
     # Clean integers
-    integer_cols = ['measurement_id', 'person_id', 'measurement_concept_id', 'measurement_type_concept_id']
+    integer_cols = [
+        'measurement_id', 'person_id', 'measurement_concept_id',
+        'measurement_type_concept_id', 'unit_concept_id',
+        'measurement_source_concept_id', 'unit_source_concept_id'
+    ]
     for col in integer_cols:
         df_measurement[col] = df_measurement[col].astype('Int64')
 

@@ -14,6 +14,7 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
 * **Human Review Gate:** AI proposals are stored in `mapping_decision`, linked to affected events, and must be explicitly approved before entering `approved_mapping_set`. Only approved mappings are applied on a subsequent run and recorded in `mapping_provenance`.
 * **Pinned OMOP Schema:** Installs all 39 tables from the OHDSI CDM v5.4.3 field specification. Populated tables use explicit DuckDB types, required fields, primary keys, staging tables, and relational acceptance checks.
 * **Explicit Trial Provenance:** Clinical SDTM records, including actual visits from SV, use the Standard `Case Report Form` Type Concept. Observation periods derived from the DM reference period use `Standard algorithm`; the source-to-type matrix is centralized and tested.
+* **Explicit Unit and Source Semantics:** CDISC units are mapped through a reviewed, case-sensitive dictionary to Standard `Unit` Concepts. A supplied but unknown unit is published as concept ID `0`, while a genuinely absent unit remains `NULL`; original values and source concept fields are retained explicitly.
 * **Clinical Time Rigor:** Derives unbiased `OBSERVATION_PERIOD` spans using strict CDISC Demographics reference dates (`RFSTDTC`/`RFENDTC`), preventing longitudinal biases from past medical history events.
 * **Software Engineering Best Practices:**
   * Parameterized SQL queries to prevent SQL injection.
@@ -142,3 +143,12 @@ of the event. The current synthetic study uses this explicit matrix:
 The assignments live in `src/omop/type_concepts.py`. A future direct central-
 laboratory feed must receive an explicit assignment (for example, `32856` —
 Lab) rather than silently inheriting the current LB assumption.
+
+## Unit and Source Concept Contract
+
+The reviewed mappings live in `src/omop/unit_concepts.py`. Publication checks
+that every non-zero `unit_concept_id` is a current Standard Concept in the
+OMOP `Unit` domain. SDTM test, condition, and drug names in this synthetic feed
+are local text rather than codes from OMOP-supported source vocabularies, so
+their corresponding `*_source_concept_id` is explicitly `0`; the verbatim
+source values remain available in the `*_source_value` fields.

@@ -48,6 +48,7 @@ def _write_valid_outputs(processed_dir):
         "condition_concept_id": [0],
         "condition_start_date": ["2023-01-10"],
         "condition_type_concept_id": [0],
+        "condition_source_concept_id": [0],
         "visit_occurrence_id": [10],
     }).to_csv(processed_dir / "CONDITION_OCCURRENCE.csv", index=False)
     pd.DataFrame({
@@ -57,6 +58,7 @@ def _write_valid_outputs(processed_dir):
         "drug_exposure_start_date": ["2023-01-10"],
         "drug_exposure_end_date": ["2023-01-10"],
         "drug_type_concept_id": [0],
+        "drug_source_concept_id": [0],
         "visit_occurrence_id": [10],
     }).to_csv(processed_dir / "DRUG_EXPOSURE.csv", index=False)
     pd.DataFrame({
@@ -65,6 +67,11 @@ def _write_valid_outputs(processed_dir):
         "measurement_concept_id": [0],
         "measurement_date": ["2023-01-10"],
         "measurement_type_concept_id": [0],
+        "unit_concept_id": [0],
+        "measurement_source_concept_id": [0],
+        "unit_source_value": ["custom-unit"],
+        "unit_source_concept_id": [0],
+        "value_source_value": ["1.0"],
         "visit_occurrence_id": [10],
     }).to_csv(processed_dir / "MEASUREMENT.csv", index=False)
 
@@ -170,6 +177,48 @@ def test_required_omop_value_is_not_silently_published(tmp_path):
             db_path=tmp_path / "omop.duckdb",
             processed_dir=processed_dir,
         )
+
+
+def test_missing_source_semantics_abort_publication(tmp_path):
+    processed_dir = tmp_path / "processed"
+    processed_dir.mkdir()
+    _write_valid_outputs(processed_dir)
+    measurement_path = processed_dir / "MEASUREMENT.csv"
+    measurement = pd.read_csv(measurement_path).drop(columns=["unit_concept_id"])
+    measurement.to_csv(measurement_path, index=False)
+
+    with pytest.raises(ValueError, match="source-semantic fields"):
+        build_omop_database(
+            db_path=tmp_path / "omop.duckdb",
+            processed_dir=processed_dir,
+        )
+
+
+def test_wrong_domain_unit_concept_aborts_publication(tmp_path):
+    processed_dir = tmp_path / "processed"
+    processed_dir.mkdir()
+    _write_valid_outputs(processed_dir)
+    measurement_path = processed_dir / "MEASUREMENT.csv"
+    measurement = pd.read_csv(measurement_path)
+    measurement["unit_concept_id"] = 999001
+    measurement.to_csv(measurement_path, index=False)
+
+    db_path = tmp_path / "omop.duckdb"
+    with duckdb.connect(str(db_path)) as con:
+        con.execute(create_table_sql("concept"))
+        con.execute("""
+            INSERT INTO concept (
+                concept_id, concept_name, domain_id, vocabulary_id,
+                concept_class_id, standard_concept, concept_code,
+                valid_start_date, valid_end_date
+            ) VALUES (999001, 'Not a unit', 'Measurement', 'LOINC',
+                      'Lab Test', 'S', 'X', '1970-01-01', '2099-12-31')
+        """)
+
+    with pytest.raises(
+        ValueError, match="invalid or wrong-domain Standard Concepts"
+    ):
+        build_omop_database(db_path=db_path, processed_dir=processed_dir)
 
 
 def test_visit_outside_observation_period_aborts_publication(tmp_path):

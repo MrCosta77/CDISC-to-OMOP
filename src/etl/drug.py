@@ -43,6 +43,7 @@ def run_drug_etl(ex_path, cm_path, output_path):
                 'dose_unit_source_value': row.get('EXDOSU') if 'EXDOSU' in row else None,
                 'route_source_value': row.get('EXROUTE') if 'EXROUTE' in row else None,
                 'drug_source_value': row.get('EXTRT'), # The specific study drug
+                'drug_source_concept_id': 0,
                 'drug_source_domain': 'EX' # Custom traceability flag
             })
             drug_id_counter += 1
@@ -77,6 +78,7 @@ def run_drug_etl(ex_path, cm_path, output_path):
                 'dose_unit_source_value': row.get('CMDOSU') if 'CMDOSU' in row else None, 
                 'route_source_value': row.get('CMROUTE') if 'CMROUTE' in row else None,
                 'drug_source_value': row.get('CMTRT'), # e.g. Paracetamol, Ibuprofen
+                'drug_source_concept_id': 0,
                 'drug_source_domain': 'CM' # Custom traceability flag
             })
             drug_id_counter += 1
@@ -95,7 +97,10 @@ def run_drug_etl(ex_path, cm_path, output_path):
     df_drug = pd.DataFrame(drug_records)
 
     # Clean integers
-    integer_cols = ['drug_exposure_id', 'person_id', 'drug_concept_id', 'drug_type_concept_id']
+    integer_cols = [
+        'drug_exposure_id', 'person_id', 'drug_concept_id',
+        'drug_type_concept_id', 'drug_source_concept_id'
+    ]
     for col in integer_cols:
         df_drug[col] = df_drug[col].astype('Int64')
 
