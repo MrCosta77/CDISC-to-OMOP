@@ -71,6 +71,7 @@ def test_llm_module_records_proposal_without_updating_csv(
     monkeypatch.setenv("PIPELINE_RUN_ID", "RUN-GATE")
     monkeypatch.setattr(module, "PROJECT_ROOT", Path(tmp_path))
     monkeypatch.setattr(module, "DB_PATH", str(db_path))
+    monkeypatch.setattr(module, "CONFIDENCE_THRESHOLD", 0.0)
     monkeypatch.setattr(
         module,
         "get_candidates_from_db_safe",

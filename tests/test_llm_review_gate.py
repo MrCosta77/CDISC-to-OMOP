@@ -4,7 +4,11 @@ import pytest
 
 from src.mapping.apply_approved_mappings import apply_approved_mappings
 from src.mapping.review_mappings import list_rules
-from src.mapping.review_store import record_mapping_decision, review_decision
+from src.mapping.review_store import (
+    get_active_mapping_rule,
+    record_mapping_decision,
+    review_decision,
+)
 from src.utils.run_context import ensure_audit_schema
 
 
@@ -215,3 +219,39 @@ def test_active_review_rules_can_be_listed(capsys):
     assert len(rejected) == 1
     assert "Hypertension -> 320128 (Essential hypertension)" in output
     assert "Fatigue" in output
+
+
+def test_threshold_and_active_rejection_are_machine_readable():
+    with duckdb.connect(":memory:") as con:
+        _create_concepts(con)
+        ensure_audit_schema(con)
+        decision_id = record_mapping_decision(
+            con,
+            run_id="RUN-LOW",
+            target_table="condition_occurrence",
+            source_value="Ambiguous term",
+            proposed_concept_id=320128,
+            score=0.45,
+            minimum_score=0.90,
+            model_name="test-model",
+            vocabulary_version="test-vocab",
+            affected_target_ids=[1],
+        )
+        assert con.execute(
+            "SELECT decision_status FROM mapping_decision WHERE mapping_decision_id = ?",
+            [decision_id],
+        ).fetchone()[0] == "LOW_CONFIDENCE"
+
+        review_decision(
+            con,
+            decision_id,
+            action="reject",
+            reviewer="QC Reviewer",
+            reason="Below the calibrated threshold",
+        )
+        status, rule = get_active_mapping_rule(
+            con, "condition_occurrence", "  AMBIGUOUS   TERM "
+        )
+
+    assert status == "REJECTED"
+    assert rule[0] == "QC Reviewer"

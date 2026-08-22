@@ -25,6 +25,9 @@ def get_standard_concept(term, domain, con):
         WHERE LOWER(concept_name) = ? 
           AND domain_id = ? 
           AND standard_concept = 'S'
+          AND (invalid_reason IS NULL OR invalid_reason = '')
+          AND CURRENT_DATE BETWEEN valid_start_date AND valid_end_date
+        ORDER BY concept_id
         LIMIT 1
     """
     res = con.execute(query_direct, (term_lower, domain)).fetchone()
@@ -39,8 +42,15 @@ def get_standard_concept(term, domain, con):
         JOIN concept c2 ON cr.concept_id_2 = c2.concept_id
         WHERE LOWER(c1.concept_name) = ?
           AND cr.relationship_id = 'Maps to'
+          AND (c1.invalid_reason IS NULL OR c1.invalid_reason = '')
+          AND CURRENT_DATE BETWEEN c1.valid_start_date AND c1.valid_end_date
+          AND (cr.invalid_reason IS NULL OR cr.invalid_reason = '')
+          AND CURRENT_DATE BETWEEN cr.valid_start_date AND cr.valid_end_date
           AND c2.standard_concept = 'S'
           AND c2.domain_id = ?
+          AND (c2.invalid_reason IS NULL OR c2.invalid_reason = '')
+          AND CURRENT_DATE BETWEEN c2.valid_start_date AND c2.valid_end_date
+        ORDER BY c2.concept_id
         LIMIT 1
     """
     res = con.execute(query_maps_to, (term_lower, domain)).fetchone()

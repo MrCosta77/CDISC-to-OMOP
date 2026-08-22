@@ -72,6 +72,7 @@ def get_candidates_from_db_safe(term, con, domain_id):
         WHERE domain_id = ?
           AND standard_concept = 'S'
           AND (invalid_reason IS NULL OR invalid_reason = '')
+          AND CURRENT_DATE BETWEEN valid_start_date AND valid_end_date
           AND ({conditions})
         ORDER BY
           CASE WHEN REGEXP_REPLACE(

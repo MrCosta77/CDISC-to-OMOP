@@ -27,10 +27,12 @@ def run_etl_condition(ae_path, mh_path, output_path):
             start_date = parse_cdisc_date(row.get('AESTDTC'))
             end_date = parse_cdisc_date(row.get('AEENDTC'))
             
-            # Prioritize AETERM, fallback to AEDECOD if empty
-            source_value = row.get('AETERM')
+            # AEDECOD is the coded/normalized adverse-event term. Preserve the
+            # verbatim investigator text separately for traceability.
+            verbatim_value = row.get('AETERM')
+            source_value = row.get('AEDECOD')
             if pd.isna(source_value) or str(source_value).strip() == '':
-                source_value = row.get('AEDECOD')
+                source_value = verbatim_value
 
             condition_records.append({
                 'condition_occurrence_id': condition_id_counter,
@@ -44,6 +46,7 @@ def run_etl_condition(ae_path, mh_path, output_path):
                 'condition_end_date': end_date.date() if pd.notna(end_date) else np.nan,
                 'condition_end_datetime': end_date if pd.notna(end_date) else pd.NaT,
                 'condition_source_value': source_value,
+                'condition_verbatim_source_value': verbatim_value,
                 'condition_source_concept_id': 0,
                 'condition_status_source_value': row.get('AEOUT') # Specific AE outcome (e.g., RECOVERED)
             })
@@ -94,6 +97,7 @@ def run_etl_condition(ae_path, mh_path, output_path):
                 'condition_end_date': np.nan, 
                 'condition_end_datetime': pd.NaT,
                 'condition_source_value': row.get('MHTERM'),
+                'condition_verbatim_source_value': row.get('MHTERM'),
                 'condition_source_concept_id': 0,
                 'condition_status_source_value': 'Medical History' # Traceability flag
             })

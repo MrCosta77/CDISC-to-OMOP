@@ -28,6 +28,27 @@ def get_vocabulary_version(con):
     return "Athena_Standard"
 
 
+def get_active_mapping_rule(con, target_table, source_value):
+    """Return the active human rule before retrieval or LLM adjudication."""
+    ensure_audit_schema(con)
+    normalized_value = normalize_source_value(source_value)
+    approved = con.execute("""
+        SELECT concept_id, approved_by, approval_reason
+        FROM approved_mapping_set
+        WHERE target_table = ? AND normalized_value = ? AND active = TRUE
+    """, (target_table, normalized_value)).fetchone()
+    if approved:
+        return "APPROVED", approved
+    rejected = con.execute("""
+        SELECT rejected_by, rejection_reason
+        FROM rejected_mapping_set
+        WHERE target_table = ? AND normalized_value = ? AND active = TRUE
+    """, (target_table, normalized_value)).fetchone()
+    if rejected:
+        return "REJECTED", rejected
+    return None, None
+
+
 def record_mapping_decision(
     con,
     *,
@@ -41,6 +62,7 @@ def record_mapping_decision(
     affected_target_ids,
     mapping_method="llm_zero_shot",
     prompt_version=PROMPT_VERSION,
+    minimum_score=0.0,
 ):
     """Store an LLM proposal without applying it to a clinical table."""
     if target_table not in TARGET_DOMAINS:
@@ -58,7 +80,12 @@ def record_mapping_decision(
         decision_status = "REJECTED_BY_POLICY"
         reviewed_by, review_reason, reviewed_at = rejection
     else:
-        decision_status = "PROPOSED" if proposed_concept_id else "UNRESOLVED"
+        if not proposed_concept_id:
+            decision_status = "UNRESOLVED"
+        elif float(score) < float(minimum_score):
+            decision_status = "LOW_CONFIDENCE"
+        else:
+            decision_status = "PROPOSED"
         reviewed_by = review_reason = reviewed_at = None
 
     con.execute("""

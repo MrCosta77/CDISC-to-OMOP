@@ -11,11 +11,15 @@ def _concept_connection():
             concept_name VARCHAR,
             domain_id VARCHAR,
             standard_concept VARCHAR,
-            invalid_reason VARCHAR
+            invalid_reason VARCHAR,
+            valid_start_date DATE,
+            valid_end_date DATE
         )
     """)
     con.executemany("""
-        INSERT INTO concept VALUES (?, ?, 'Measurement', 'S', NULL)
+        INSERT INTO concept VALUES (
+            ?, ?, 'Measurement', 'S', NULL, '1970-01-01', '2099-12-31'
+        )
     """, [
         ("4116636", "ST segment duration"),
         ("4116637", "QT interval duration"),

@@ -55,3 +55,30 @@ def test_condition_etl_rejects_unparseable_mh_date(monkeypatch, tmp_path):
             "mh.sas7bdat",
             tmp_path / "CONDITION_OCCURRENCE.csv",
         )
+
+
+def test_ae_prefers_controlled_term_and_preserves_verbatim(monkeypatch, tmp_path):
+    ae = pd.DataFrame([{
+        "USUBJID": "CDISC-01-701-002",
+        "AESTDTC": "2023-01-10",
+        "AEENDTC": "2023-01-11",
+        "AETERM": "Application site erythema",
+        "AEDECOD": "APPLICATION SITE ERYTHEMA",
+        "AEOUT": "RECOVERED/RESOLVED",
+    }])
+
+    def fake_read_sas(path, **_kwargs):
+        if str(path).endswith("ae.sas7bdat"):
+            return ae
+        raise FileNotFoundError(path)
+
+    monkeypatch.setattr(pd, "read_sas", fake_read_sas)
+    output_path = tmp_path / "CONDITION_OCCURRENCE.csv"
+    run_etl_condition("ae.sas7bdat", "mh.sas7bdat", output_path)
+
+    result = pd.read_csv(output_path)
+    assert result.loc[0, "condition_source_value"] == "APPLICATION SITE ERYTHEMA"
+    assert (
+        result.loc[0, "condition_verbatim_source_value"]
+        == "Application site erythema"
+    )

@@ -9,10 +9,11 @@ from pathlib import Path
 # Setup paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
-from src.utils.config import  DB_PATH, MODEL_NAME
+from src.utils.config import DB_PATH, MODEL_NAME, CONFIDENCE_THRESHOLD
 from src.mapping.llm_shared import get_candidates_from_db_safe, calculate_confidence_score
 from src.mapping.review_store import (
     get_vocabulary_version,
+    get_active_mapping_rule,
     record_mapping_decision,
 )
 from src.utils.run_context import require_run_id
@@ -102,11 +103,32 @@ def run_llm_measurement_mapping():
     print(f"Found {len(orphan_terms)} orphan clinical terms. Handing over to AI...")
     
     proposed_count = 0
+    low_confidence_count = 0
     unresolved_count = 0
+    policy_count = 0
     with duckdb.connect(DB_PATH) as con:
         vocabulary_version = get_vocabulary_version(con)
         for term in orphan_terms:
             print(f"\n🔍 Processing: '{term}'")
+            rule_status, _ = get_active_mapping_rule(con, "measurement", term)
+            if rule_status == "APPROVED":
+                print("   ↪ Active approval already exists; LLM skipped.")
+                continue
+            affected_ids = df_meas.loc[
+                unmapped_mask & (df_meas['measurement_source_value'] == term),
+                'measurement_id',
+            ].tolist()
+            if rule_status == "REJECTED":
+                record_mapping_decision(
+                    con, run_id=run_id, target_table="measurement",
+                    source_value=term, proposed_concept_id=0, score=0.0,
+                    model_name=MODEL_NAME, vocabulary_version=vocabulary_version,
+                    affected_target_ids=affected_ids,
+                    minimum_score=CONFIDENCE_THRESHOLD,
+                )
+                policy_count += 1
+                print("   🔒 Active rejection reused; retrieval and LLM skipped.")
+                continue
             candidates = get_candidates_from_db_safe(term, con, 'Measurement')
             chosen_id = 0
             chosen_name = None
@@ -122,10 +144,6 @@ def run_llm_measurement_mapping():
             else:
                 print("   ⚠️ DuckDB found no keyword candidates.")
 
-            affected_ids = df_meas.loc[
-                unmapped_mask & (df_meas['measurement_source_value'] == term),
-                'measurement_id',
-            ].tolist()
             score = calculate_confidence_score(term, chosen_name) if chosen_id else 0.0
             record_mapping_decision(
                 con,
@@ -137,16 +155,24 @@ def run_llm_measurement_mapping():
                 model_name=MODEL_NAME,
                 vocabulary_version=vocabulary_version,
                 affected_target_ids=affected_ids,
+                minimum_score=CONFIDENCE_THRESHOLD,
             )
-            if chosen_id:
+            if chosen_id and score >= CONFIDENCE_THRESHOLD:
                 proposed_count += 1
+            elif chosen_id:
+                low_confidence_count += 1
+                print(
+                    f"   ⚠️ Candidate retained for review below threshold "
+                    f"({score:.2f} < {CONFIDENCE_THRESHOLD:.2f})."
+                )
             else:
                 unresolved_count += 1
 
     print("\n" + "-" * 70)
     print(
-        f"📝 Stored {proposed_count} proposals and {unresolved_count} unresolved "
-        "terms for human review."
+        f"📝 Stored {proposed_count} proposals, {low_confidence_count} low-"
+        f"confidence candidates, {unresolved_count} unresolved terms and "
+        f"{policy_count} policy rejections."
     )
     print("🔒 No pending LLM proposal was applied to MEASUREMENT.csv.")
 
