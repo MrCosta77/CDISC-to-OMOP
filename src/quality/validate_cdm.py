@@ -11,7 +11,7 @@ from src.etl.build_database import validate_published_database
 def main():
     result = validate_published_database()
     print(
-        f"✅ OMOP CDM {result['cdm_version']} ({result['source_release']}) "
+        f"OMOP CDM {result['cdm_version']} ({result['source_release']}) "
         f"accepted: {result['schema_table_count']} official tables."
     )
     for table, count in result["row_counts"].items():

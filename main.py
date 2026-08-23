@@ -18,6 +18,7 @@ from src.utils.run_context import (
     start_pipeline_run,
     validate_required_inputs,
 )
+from src.quality.validate_cdisc_inputs import validate_cdisc_inputs
 
 # 2. INITIALIZE THE ORCHESTRATOR LOGGER
 logger = get_logger("Orchestrator")
@@ -65,6 +66,8 @@ def main():
     try:
         start_pipeline_run(run_id)
         validate_required_inputs()
+        input_counts = validate_cdisc_inputs()
+        logger.info(f"CDISC input contracts accepted: {input_counts}")
 
         steps = [
             ("src/utils/setup_cdm_schema.py", "0. Install OMOP CDM 5.4 Schema"),

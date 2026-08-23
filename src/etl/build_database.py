@@ -188,6 +188,29 @@ def _require_valid_date_range(con, table, start_field, end_field, nullable_end=F
         )
 
 
+def _require_consistent_visit_link(
+    con, event, event_date, visit, max_window_days=0
+):
+    count = con.execute(f"""
+        SELECT COUNT(*)
+        FROM {quote_identifier(event)} e
+        LEFT JOIN {quote_identifier(visit)} v
+          ON e.visit_occurrence_id = v.visit_occurrence_id
+        WHERE e.visit_occurrence_id IS NOT NULL
+          AND (
+              v.visit_occurrence_id IS NULL
+              OR v.person_id <> e.person_id
+              OR e.{quote_identifier(event_date)} < v.visit_start_date - INTERVAL '{int(max_window_days)} days'
+              OR e.{quote_identifier(event_date)} > v.visit_end_date + INTERVAL '{int(max_window_days)} days'
+          )
+    """).fetchone()[0]
+    if count:
+        raise ValueError(
+            f"Visit-link validation failed: {count} rows in {event} reference "
+            "a visit for another person or outside the event date."
+        )
+
+
 def _validate_concepts(con, candidates):
     concept_fields = []
     requested_ids = set()
@@ -284,7 +307,6 @@ def _validate_candidates(con, candidates):
             "visit_occurrence_id",
             nullable=True,
         )
-
     _require_valid_date_range(
         con,
         candidates["observation_period"],
@@ -309,6 +331,17 @@ def _validate_candidates(con, candidates):
         raise ValueError(
             "Temporal validation failed: "
             f"{visits_outside_period} visits fall outside the observation period."
+        )
+    for table, event_date, max_window_days in (
+        ("condition_occurrence", "condition_start_date", 0),
+        ("drug_exposure", "drug_exposure_start_date", 0),
+        # LB/VS/EG carry an explicit CDISC VISITNUM. The synthetic protocol
+        # permits assessments around the nominal SV date, so that explicit
+        # linkage wins within a reviewed seven-day visit window.
+        ("measurement", "measurement_date", 7),
+    ):
+        _require_consistent_visit_link(
+            con, candidates[table], event_date, visit, max_window_days
         )
     _require_valid_date_range(
         con,

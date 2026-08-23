@@ -86,6 +86,15 @@ Each execution receives a unique `run_id`. Its status, input manifest, Git commi
 configuration snapshot, output counts, error (if any), and mapping provenance are
 stored in DuckDB. Track execution in real time or inspect `logs/pipeline.log`.
 
+The orchestrator validates all ten SDTM input contracts before ETL. To run this
+gate independently:
+```powershell
+.\.venv\Scripts\python -m src.quality.validate_cdisc_inputs
+```
+The CI suite uses `tests/fixtures/golden_cdisc.json`, so schema, key, timeline,
+controlled-terminology and unit regressions are testable without proprietary
+SAS files or Athena.
+
 **7. Validate the published OMOP CDM:**
 ```powershell
 .\.venv\Scripts\python -m src.quality.validate_cdm

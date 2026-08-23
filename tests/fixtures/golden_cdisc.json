@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "domains": {
+    "dm": [{"USUBJID": "STUDY-001", "BRTHDTC": "1980-04-12", "SEX": "F", "RACE": "WHITE", "RFSTDTC": "2025-01-01", "RFENDTC": "2025-03-31"}],
+    "ae": [{"USUBJID": "STUDY-001", "AESEQ": 1, "AETERM": "Headache", "AEDECOD": "HEADACHE", "AESEV": "MILD", "AESER": "N", "AESTDTC": "2025-01-10", "AEENDTC": "2025-01-11"}],
+    "mh": [{"USUBJID": "STUDY-001", "MHSEQ": 1, "MHTERM": "Hypertension", "MHSTDTC": "2020-01-01"}],
+    "ex": [{"USUBJID": "STUDY-001", "EXSEQ": 1, "EXTRT": "Placebo", "EXSTDTC": "2025-01-02", "EXENDTC": "2025-03-31"}],
+    "cm": [{"USUBJID": "STUDY-001", "CMSEQ": 1, "CMTRT": "Lisinopril", "CMSTDTC": "2020-01-01", "CMENDTC": ""}],
+    "lb": [{"USUBJID": "STUDY-001", "LBSEQ": 1, "VISITNUM": 1, "LBTEST": "Glucose", "LBORRES": "90", "LBORRESU": "mg/dL", "LBDTC": "2025-01-01"}],
+    "vs": [{"USUBJID": "STUDY-001", "VSSEQ": 1, "VISITNUM": 1, "VSTEST": "Heart Rate", "VSORRES": "72", "VSORRESU": "beats/min", "VSDTC": "2025-01-01"}],
+    "eg": [{"USUBJID": "STUDY-001", "EGSEQ": 1, "VISITNUM": 1, "EGTEST": "QT Duration", "EGORRES": "400", "EGORRESU": "msec", "EGDTC": "2025-01-01"}],
+    "sv": [{"USUBJID": "STUDY-001", "VISITNUM": 1, "VISIT": "Visit 1", "SVSTDTC": "2025-01-01", "SVENDTC": "2025-01-01"}],
+    "ds": [{"USUBJID": "STUDY-001", "DSSEQ": 1, "DSTERM": "COMPLETED", "DSDECOD": "COMPLETED", "DSSTDTC": "2025-03-31"}]
+  }
+}

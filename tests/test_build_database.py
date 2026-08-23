@@ -238,6 +238,22 @@ def test_visit_outside_observation_period_aborts_publication(tmp_path):
         )
 
 
+def test_event_linked_outside_visit_aborts_publication(tmp_path):
+    processed_dir = tmp_path / "processed"
+    processed_dir.mkdir()
+    _write_valid_outputs(processed_dir)
+    condition_path = processed_dir / "CONDITION_OCCURRENCE.csv"
+    conditions = pd.read_csv(condition_path)
+    conditions.loc[0, "condition_start_date"] = "2023-02-11"
+    conditions.to_csv(condition_path, index=False)
+
+    with pytest.raises(ValueError, match="Visit-link validation failed"):
+        build_omop_database(
+            db_path=tmp_path / "omop.duckdb",
+            processed_dir=processed_dir,
+        )
+
+
 @pytest.mark.parametrize(
     ("concept_id", "standard_concept", "valid_end_date"),
     [
