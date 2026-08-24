@@ -13,7 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RAW_DIR = PROJECT_ROOT / "data" / "raw"
 
 REQUIRED_COLUMNS = {
-    "dm": {"USUBJID", "BRTHDTC", "SEX", "RACE", "RFSTDTC", "RFENDTC"},
+    "dm": {"STUDYID", "USUBJID", "SUBJID", "SITEID", "BRTHDTC", "SEX", "RACE", "RFSTDTC", "RFENDTC"},
     "ae": {"USUBJID", "AESEQ", "AETERM", "AEDECOD", "AESEV", "AESER", "AESTDTC", "AEENDTC"},
     "mh": {"USUBJID", "MHSEQ", "MHTERM", "MHSTDTC"},
     "ex": {"USUBJID", "EXSEQ", "EXTRT", "EXSTDTC", "EXENDTC"},
@@ -36,6 +36,14 @@ DATE_FIELDS = {
     "eg": ("EGDTC",),
     "sv": ("SVSTDTC", "SVENDTC"),
     "ds": ("DSSTDTC",),
+}
+
+RACE_TERMS = {
+    "WHITE",
+    "BLACK OR AFRICAN AMERICAN",
+    "ASIAN",
+    "OTHER",
+    "UNKNOWN",
 }
 
 
@@ -80,6 +88,19 @@ def validate_frames(frames: dict[str, pd.DataFrame]) -> dict[str, int]:
     dm = frames["dm"]
     _require(not dm["USUBJID"].duplicated().any(), "DM.USUBJID must be unique")
     _require(set(dm["SEX"].dropna()) <= {"M", "F", "U"}, "DM.SEX contains invalid controlled terminology")
+    races = dm["RACE"].fillna("").astype(str).str.strip()
+    _require(races.ne("").all(), "DM.RACE is required")
+    _require(set(races) <= RACE_TERMS, "DM.RACE contains invalid controlled terminology")
+    study_ids = dm["STUDYID"].fillna("").astype(str).str.strip()
+    site_ids = dm["SITEID"].fillna("").astype(str).str.strip()
+    subjids = dm["SUBJID"].fillna("").astype(str).str.strip()
+    _require(study_ids.ne("").all(), "DM.STUDYID is required")
+    _require(site_ids.ne("").all(), "DM.SITEID is required")
+    _require(subjids.ne("").all(), "DM.SUBJID is required")
+    _require(
+        (subjids.str.split("-").str[0] == site_ids).all(),
+        "DM.SITEID conflicts with SUBJID",
+    )
     dm_start = parsed[("dm", "RFSTDTC")]
     dm_end = parsed[("dm", "RFENDTC")]
     _require(dm_start.notna().all() and dm_end.notna().all(), "DM reference dates are required")

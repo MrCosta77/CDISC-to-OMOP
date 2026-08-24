@@ -10,6 +10,7 @@ from src.omop.cdm54 import create_table_sql, expected_columns, load_table_specs
 
 
 PROCESSED_FILES = (
+    "CARE_SITE.csv",
     "PERSON.csv",
     "VISIT_OCCURRENCE.csv",
     "CONDITION_OCCURRENCE.csv",
@@ -21,11 +22,16 @@ PROCESSED_FILES = (
 
 def _write_valid_outputs(processed_dir):
     pd.DataFrame({
+        "care_site_id": [100],
+        "care_site_source_value": ["STUDY|701"],
+    }).to_csv(processed_dir / "CARE_SITE.csv", index=False)
+    pd.DataFrame({
         "person_id": [1],
         "gender_concept_id": [0],
         "year_of_birth": [1980],
         "race_concept_id": [0],
         "ethnicity_concept_id": [0],
+        "care_site_id": [100],
     }).to_csv(processed_dir / "PERSON.csv", index=False)
     pd.DataFrame({
         "observation_period_id": [1],
@@ -161,6 +167,22 @@ def test_relational_error_rolls_back_existing_database(tmp_path):
 
     with duckdb.connect(str(db_path), read_only=True) as con:
         assert con.execute("SELECT person_id FROM person").fetchall() == [(7,)]
+
+
+def test_unknown_person_care_site_aborts_publication(tmp_path):
+    processed_dir = tmp_path / "processed"
+    processed_dir.mkdir()
+    _write_valid_outputs(processed_dir)
+    person_path = processed_dir / "PERSON.csv"
+    person = pd.read_csv(person_path)
+    person["care_site_id"] = 999
+    person.to_csv(person_path, index=False)
+
+    with pytest.raises(ValueError, match="do not reference"):
+        build_omop_database(
+            db_path=tmp_path / "omop.duckdb",
+            processed_dir=processed_dir,
+        )
 
 
 def test_required_omop_value_is_not_silently_published(tmp_path):

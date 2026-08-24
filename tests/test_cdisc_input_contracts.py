@@ -24,6 +24,27 @@ def test_unknown_subject_is_rejected():
         validate_frames(frames)
 
 
+def test_invalid_race_term_is_rejected():
+    frames = _frames()
+    frames["dm"].loc[0, "RACE"] = "BLACK"
+    with pytest.raises(ValueError, match="RACE contains invalid"):
+        validate_frames(frames)
+
+
+def test_site_must_be_present_and_match_subjid():
+    frames = _frames()
+    frames["dm"].loc[0, "SITEID"] = "999"
+    with pytest.raises(ValueError, match="SITEID conflicts"):
+        validate_frames(frames)
+
+
+def test_blank_site_is_rejected():
+    frames = _frames()
+    frames["dm"].loc[0, "SITEID"] = ""
+    with pytest.raises(ValueError, match="SITEID is required"):
+        validate_frames(frames)
+
+
 def test_numeric_measurement_requires_source_unit():
     frames = _frames()
     frames["eg"].loc[0, "EGORRESU"] = ""

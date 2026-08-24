@@ -8,22 +8,37 @@ from datetime import date, datetime
 SAS_DATE_EPOCH = pd.Timestamp("1960-01-01")
 SAS_DAY_COUNT_PATTERN = re.compile(r"^[+-]?\d+(?:\.0+)?$")
 
+def generate_stable_id(value, namespace=None):
+    """Generate a deterministic positive 64-bit identifier in a namespace."""
+    if pd.isna(value):
+        return None
+
+    clean_value = str(value).strip()
+    if not clean_value or clean_value.lower() == 'nan':
+        return None
+
+    payload = f"{namespace}|{clean_value}" if namespace else clean_value
+    return int(hashlib.sha256(payload.encode('utf-8')).hexdigest()[:15], 16)
+
+
 def generate_person_id(usubjid):
     """
     Generates a deterministic, collision-resistant 64-bit integer
     from the CDISC USUBJID using SHA-256.
     """
-    # 1. Catch Pandas NA, NaT, None, or numpy NaN cleanly
-    if pd.isna(usubjid):
+    # No namespace is used here to preserve IDs created by earlier releases.
+    return generate_stable_id(usubjid)
+
+
+def generate_care_site_id(studyid, siteid):
+    """Generate a stable site identifier scoped to its source study."""
+    if pd.isna(studyid) or pd.isna(siteid):
         return None
-        
-    # 2. Convert to string and catch empty strings or literal 'nan'
-    clean_id = str(usubjid).strip()
-    if not clean_id or clean_id.lower() == 'nan':
+    study = str(studyid).strip()
+    site = str(siteid).strip()
+    if not study or not site:
         return None
-        
-    # 3. Secure Hash
-    return int(hashlib.sha256(clean_id.encode('utf-8')).hexdigest()[:15], 16)
+    return generate_stable_id(f"{study}|{site}", "CARE_SITE")
 
 
 def parse_cdisc_date(value):

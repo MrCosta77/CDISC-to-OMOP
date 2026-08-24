@@ -23,6 +23,7 @@ from src.omop.type_concepts import TYPE_CONCEPT_FIELDS
 
 
 PUBLICATION_FILES = {
+    "care_site": "CARE_SITE.csv",
     "person": "PERSON.csv",
     "observation_period": "OBSERVATION_PERIOD.csv",
     "visit_occurrence": "VISIT_OCCURRENCE.csv",
@@ -286,8 +287,12 @@ def _validate_concepts(con, candidates):
 
 
 def _validate_candidates(con, candidates):
+    care_site = candidates["care_site"]
     person = candidates["person"]
     visit = candidates["visit_occurrence"]
+    _require_no_orphans(
+        con, person, "care_site_id", care_site, "care_site_id", nullable=True
+    )
     for table in (
         "observation_period",
         "visit_occurrence",

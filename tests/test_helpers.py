@@ -7,7 +7,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
-from src.utils.helpers import generate_person_id
+from src.utils.helpers import generate_care_site_id, generate_person_id
 
 def test_generate_person_id_determinism():
     """Test if the same USUBJID always generates the exact same integer ID."""
@@ -16,6 +16,7 @@ def test_generate_person_id_determinism():
     id2 = generate_person_id(usubjid)
     
     assert id1 == id2, "Determinism failed: Same input generated different IDs"
+    assert id1 == 840021971452292762, "Existing PERSON IDs must remain stable"
     assert isinstance(id1, int), "Type failed: Generated ID is not an integer"
 
 def test_generate_person_id_collision():
@@ -41,3 +42,9 @@ def test_generate_person_id_bigint_bounds():
     
     assert generated_id > 0, "Generated ID must be strictly positive"
     assert generated_id <= max_bigint, f"ID {generated_id} exceeds 64-bit maximum"
+
+
+def test_care_site_id_is_study_scoped_and_deterministic():
+    site_id = generate_care_site_id("STUDY-A", "701")
+    assert site_id == generate_care_site_id("STUDY-A", "701")
+    assert site_id != generate_care_site_id("STUDY-B", "701")

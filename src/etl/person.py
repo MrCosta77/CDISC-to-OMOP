@@ -5,7 +5,13 @@ import os
 
 # Add the src directory to the python path to import utils
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from src.utils.helpers import generate_person_id, GENDER_MAP, RACE_MAP, ETHNICITY_MAP
+from src.utils.helpers import (
+    ETHNICITY_MAP,
+    GENDER_MAP,
+    RACE_MAP,
+    generate_care_site_id,
+    generate_person_id,
+)
 
 def run_etl_person(input_path, output_path):
     """
@@ -35,6 +41,9 @@ def run_etl_person(input_path, output_path):
             'birth_datetime': birth_date if pd.notna(birth_date) else pd.NaT,
             'race_concept_id': RACE_MAP.get(str(row.get('RACE')).upper(), 0),
             'ethnicity_concept_id': ETHNICITY_MAP.get(str(row.get('ETHNIC')).upper(), 0),
+            'care_site_id': generate_care_site_id(
+                row.get('STUDYID'), row.get('SITEID')
+            ),
             
             # Traceability (Source values are critical in RWE)
             'person_source_value': row.get('USUBJID'),

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "domains": {
-    "dm": [{"USUBJID": "STUDY-001", "BRTHDTC": "1980-04-12", "SEX": "F", "RACE": "WHITE", "RFSTDTC": "2025-01-01", "RFENDTC": "2025-03-31"}],
+    "dm": [{"STUDYID": "STUDY", "USUBJID": "STUDY-001", "SUBJID": "701-001", "SITEID": "701", "BRTHDTC": "1980-04-12", "SEX": "F", "RACE": "WHITE", "RFSTDTC": "2025-01-01", "RFENDTC": "2025-03-31"}],
     "ae": [{"USUBJID": "STUDY-001", "AESEQ": 1, "AETERM": "Headache", "AEDECOD": "HEADACHE", "AESEV": "MILD", "AESER": "N", "AESTDTC": "2025-01-10", "AEENDTC": "2025-01-11"}],
     "mh": [{"USUBJID": "STUDY-001", "MHSEQ": 1, "MHTERM": "Hypertension", "MHSTDTC": "2020-01-01"}],
     "ex": [{"USUBJID": "STUDY-001", "EXSEQ": 1, "EXTRT": "Placebo", "EXSTDTC": "2025-01-02", "EXENDTC": "2025-03-31"}],

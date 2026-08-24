@@ -45,7 +45,7 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
 ## 🛠️ Pipeline Execution Flow
 
 1. **Phase 1: Schema, Vocabularies & Audit Setup** — Installs the pinned 39-table OMOP CDM v5.4.3 contract, loads typed vocabularies, and builds audit metadata.
-2. **Phase 2: Structural ETL** — Transforms raw CDISC domains (DM, AE, MH, EX, CM, LB, VS, EG, SV, DS) into OMOP clinical tables. Observation periods come from DM, actual visits come from SV, and event links are added only when the visit is explicit or temporally unambiguous.
+2. **Phase 2: Structural ETL** — Transforms raw CDISC domains (DM, AE, MH, EX, CM, LB, VS, EG, SV, DS) into OMOP clinical tables. De-identified `STUDYID + SITEID` values become `CARE_SITE` source keys linked from `PERSON`; no site name, location, or facility type is invented. Observation periods come from DM, actual visits come from SV, and event links are added only when the visit is explicit or temporally unambiguous.
 3. **Phase 3: Semantic Mapping** — Applies deterministic mappings and previously approved human mappings. The LLM only proposes candidates for the remaining orphan terms; pending proposals stay as concept ID `0` in the published clinical tables.
 4. **Phase 4: Validated Publication** — Loads CSV outputs into temporary staging tables, casts them into the official contract, validates required fields, keys, dates, concepts and relations, then atomically publishes `cdisc_omop.duckdb`.
 
@@ -86,7 +86,9 @@ Each execution receives a unique `run_id`. Its status, input manifest, Git commi
 configuration snapshot, output counts, error (if any), and mapping provenance are
 stored in DuckDB. Track execution in real time or inspect `logs/pipeline.log`.
 
-The orchestrator validates all ten SDTM input contracts before ETL. To run this
+The orchestrator validates all ten SDTM input contracts before ETL, including
+CDISC Race terminology and the consistency of `STUDYID`, `SITEID`, `SUBJID`,
+and `USUBJID`. To run this
 gate independently:
 ```powershell
 .\.venv\Scripts\python -m src.quality.validate_cdisc_inputs
