@@ -23,3 +23,15 @@ CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.90"))
 VOCAB_DIR = resolve_project_path(
     os.getenv("VOCAB_DIR", str(PROJECT_ROOT / "data" / "omop_vocab"))
 )
+VOCAB_MANIFEST_PATH = resolve_project_path(
+    os.getenv(
+        "VOCAB_MANIFEST_PATH",
+        str(PROJECT_ROOT / "resources" / "athena_vocabulary_manifest.json"),
+    )
+)
+MAPPING_RULES_PATH = resolve_project_path(
+    os.getenv(
+        "MAPPING_RULES_PATH",
+        str(PROJECT_ROOT / "resources" / "mapping_rules.json"),
+    )
+)

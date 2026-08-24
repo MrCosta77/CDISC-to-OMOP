@@ -1,0 +1,88 @@
+{
+  "approved": [
+    {
+      "concept_id": 316866,
+      "normalized_value": "hypertension",
+      "review_reason": "Use a generic hypertensive disorder without inventing stage or severity.",
+      "reviewed_at": "2026-08-20T23:57:52.203984",
+      "reviewed_by": "Mario Costa",
+      "source_value": "Hypertension",
+      "target_table": "condition_occurrence"
+    },
+    {
+      "concept_id": 201826,
+      "normalized_value": "type 2 diabetes",
+      "review_reason": "Type 2 diabetes mellitus is the generic Standard Condition concept supported by the source term.",
+      "reviewed_at": "2026-08-20T23:58:08.277416",
+      "reviewed_by": "Mario Costa",
+      "source_value": "Type 2 Diabetes",
+      "target_table": "condition_occurrence"
+    },
+    {
+      "concept_id": 1125315,
+      "normalized_value": "paracetamol",
+      "review_reason": "Paracetamol sem dose ou forma farmac\u00eautica deve mapear para o ingrediente Standard RxNorm acetaminophen, sem acrescentar especificidade n\u00e3o suportada pela origem.",
+      "reviewed_at": "2026-08-24T14:46:11.750741",
+      "reviewed_by": "Mario Costa",
+      "source_value": "Paracetamol",
+      "target_table": "drug_exposure"
+    },
+    {
+      "concept_id": 3025809,
+      "normalized_value": "qt duration",
+      "review_reason": "CDISC QT Interval Aggregate maps to LOINC Q-T interval; ST segment duration is incorrect.",
+      "reviewed_at": "2026-08-20T23:57:59.489043",
+      "reviewed_by": "Mario Costa",
+      "source_value": "QT Duration",
+      "target_table": "measurement"
+    },
+    {
+      "concept_id": 3013078,
+      "normalized_value": "rr duration",
+      "review_reason": "CDISC RR Interval Aggregate maps to LOINC R-R interval by EKG.",
+      "reviewed_at": "2026-08-20T23:58:22.022480",
+      "reviewed_by": "Mario Costa",
+      "source_value": "RR Duration",
+      "target_table": "measurement"
+    },
+    {
+      "concept_id": 3025315,
+      "normalized_value": "weight",
+      "review_reason": "Body weight is a valid Standard Measurement concept for numeric weight.",
+      "reviewed_at": "2026-08-20T23:58:03.213382",
+      "reviewed_by": "Mario Costa",
+      "source_value": "Weight",
+      "target_table": "measurement"
+    }
+  ],
+  "rejected": [
+    {
+      "normalized_value": "application site erythema",
+      "review_reason": "Exact Standard concept belongs to Observation; generic Erythema loses application-site specificity.",
+      "reviewed_at": "2026-08-20T23:57:39.521320",
+      "reviewed_by": "Mario Costa",
+      "source_value": "Application site erythema",
+      "target_table": "condition_occurrence"
+    },
+    {
+      "normalized_value": "fatigue",
+      "review_reason": "Fatigue does not establish chronic fatigue syndrome; exact Standard concept belongs to Observation.",
+      "reviewed_at": "2026-08-20T23:57:47.694974",
+      "reviewed_by": "Mario Costa",
+      "source_value": "Fatigue",
+      "target_table": "condition_occurrence"
+    },
+    {
+      "normalized_value": "active drug 50mg",
+      "review_reason": "Blinded treatment label does not identify an ingredient or RxNorm drug.",
+      "reviewed_at": "2026-08-20T23:58:15.028428",
+      "reviewed_by": "Mario Costa",
+      "source_value": "Active Drug 50mg",
+      "target_table": "drug_exposure"
+    }
+  ],
+  "ruleset_fingerprint": "7c2cb3df202326939443353df8e46a5269edd8f7e5f558572407e601d2868f8e",
+  "schema_version": 1,
+  "vocabulary_fingerprint": "91d706accf323fcdcb0eb6dd6aafb0246ae90143c87641fca6d1d5794a10fa9b",
+  "vocabulary_version": "Athena-91d706accf32"
+}

@@ -1,0 +1,66 @@
+{
+  "files": {
+    "CONCEPT.csv": {
+      "sha256": "5ca3652c2bc6b692bafd8d813540123fff32d3fc2a14e3eab1a5885fc6db7658",
+      "size_bytes": 883852735
+    },
+    "CONCEPT_CLASS.csv": {
+      "sha256": "c3ce4fd292e29007f89b00a2815120a4d7fbb9603325babb5cfa09922decd750",
+      "size_bytes": 18593
+    },
+    "CONCEPT_RELATIONSHIP.csv": {
+      "sha256": "5ead7edf26b4209a4ab4251be1620ad652db3aaf7db6683c48ac91dab817101e",
+      "size_bytes": 1967247854
+    },
+    "DOMAIN.csv": {
+      "sha256": "86fee56d2c7a55b3462ad2739bb49e137eaafd79973824d13267c029038bdc99",
+      "size_bytes": 1745
+    },
+    "RELATIONSHIP.csv": {
+      "sha256": "b386c30cf40978eba08dd7be2fc4a5209b37876208f96fe7644f30a1f0e23995",
+      "size_bytes": 53722
+    },
+    "VOCABULARY.csv": {
+      "sha256": "edf9f03ac3ef3d2c65c4048d25f269516459f523c94fb52bc37babb09d4035a8",
+      "size_bytes": 6495
+    }
+  },
+  "fingerprint": "91d706accf323fcdcb0eb6dd6aafb0246ae90143c87641fca6d1d5794a10fa9b",
+  "schema_version": 1,
+  "version_label": "Athena-91d706accf32",
+  "vocabulary_versions": {
+    "ABMS": "2018-06-26 ABMS",
+    "ATC": "ATC 2026-02-01",
+    "CDISC": "2023_12D",
+    "CDM": "CDM v6.0.0",
+    "CMS Place of Service": "2009-01-11",
+    "CPT4": "2025 Release",
+    "Currency": "2008",
+    "Episode": "Episode 20201014",
+    "Ethnicity": "Ethnicity 20250807",
+    "HCPCS": "20260101 Alpha Numeric HCPCS File",
+    "ICD10CM": "ICD10CM FY2026 code descriptions",
+    "ICD9CM": "ICD9CM v32 master descriptions",
+    "ICD9Proc": "ICD9CM v32 master descriptions",
+    "LOINC": "LOINC 2.80",
+    "Language": "Language 20221030",
+    "Medicare Specialty": "2018-06-26 Specialty",
+    "NDC": "NDC 20260222",
+    "NUCC": "NUCC 25.0",
+    "None": "v5.0 27-FEB-26",
+    "OMOP Extension": "OMOP Extension 20260202",
+    "OMOP Invest Drug": "OMOP Invest Drug version 2024-06-03",
+    "OSM": "OSM Release 2019-02-21",
+    "Race": "Version 1.0",
+    "Revenue Code": "2010 Release",
+    "RxNorm": "RxNorm 20260105",
+    "RxNorm Extension": "RxNorm Extension 2026-01-14",
+    "SNOMED": "2025-02-01 SNOMED CT International Edition; 2025-03-01 SNOMED CT US Edition; 2025-04-09 SNOMED CT UK Edition",
+    "SOPT": "SOPT Version 9.2",
+    "SPL": "NDC 20260222",
+    "Type Concept": "Type Concept 20260202",
+    "UCUM": "Version 1.8.2",
+    "US Census": "US Census 2017 Release",
+    "Visit": "Visit 20211216"
+  }
+}

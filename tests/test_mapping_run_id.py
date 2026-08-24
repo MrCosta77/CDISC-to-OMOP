@@ -43,6 +43,10 @@ def test_deterministic_mapping_records_run_id_without_duplicates():
             )
         """)
         ensure_audit_schema(con)
+        con.execute(
+            "CREATE TABLE cdm_source (vocabulary_version VARCHAR)"
+        )
+        con.execute("INSERT INTO cdm_source VALUES ('Athena-test123456')")
 
         for _ in range(2):
             mapped, count = process_domain(
@@ -59,12 +63,12 @@ def test_deterministic_mapping_records_run_id_without_duplicates():
             assert mapped.loc[0, "condition_concept_id"] == 320128
 
         audit = con.execute("""
-            SELECT run_id, assigned_concept_id, COUNT(*)
+            SELECT run_id, assigned_concept_id, vocabulary_version, COUNT(*)
             FROM mapping_provenance
-            GROUP BY run_id, assigned_concept_id
+            GROUP BY run_id, assigned_concept_id, vocabulary_version
         """).fetchone()
 
-    assert audit == ("RUN-TEST", 320128, 1)
+    assert audit == ("RUN-TEST", 320128, "Athena-test123456", 1)
 
 
 def test_deterministic_mapping_ignores_expired_concepts_and_breaks_ties():

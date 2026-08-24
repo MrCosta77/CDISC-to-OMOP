@@ -12,8 +12,14 @@ from src.utils.config import (
     CONFIDENCE_THRESHOLD,
     DB_PATH,
     MODEL_NAME,
+    MAPPING_RULES_PATH,
     PROJECT_ROOT,
     VOCAB_DIR,
+    VOCAB_MANIFEST_PATH,
+)
+from src.utils.vocabulary_identity import (
+    VOCABULARY_FILES,
+    load_vocabulary_manifest,
 )
 
 
@@ -200,8 +206,9 @@ def validate_required_inputs():
     raw_dir = PROJECT_ROOT / "data" / "raw"
     required_paths = [raw_dir / f"{name}.sas7bdat" for name in REQUIRED_RAW_DATASETS]
     required_paths.extend(
-        [Path(VOCAB_DIR) / "CONCEPT.csv", Path(VOCAB_DIR) / "CONCEPT_RELATIONSHIP.csv"]
+        [Path(VOCAB_DIR) / name for name in VOCABULARY_FILES]
     )
+    required_paths.extend([Path(VOCAB_MANIFEST_PATH), Path(MAPPING_RULES_PATH)])
     missing = [str(path) for path in required_paths if not path.is_file()]
     if missing:
         raise FileNotFoundError(
@@ -215,13 +222,20 @@ def build_input_manifest():
         f"{name}.sas7bdat": _optional_file_manifest(raw_dir / f"{name}.sas7bdat")
         for name in REQUIRED_RAW_DATASETS
     }
-    # Vocabulary files are very large; size and timestamp identify the local extract
-    # without adding several minutes of hashing to every pipeline run.
+    vocabulary_identity = load_vocabulary_manifest(VOCAB_MANIFEST_PATH)
     vocab_files = {
         name: _optional_file_manifest(Path(VOCAB_DIR) / name, include_hash=False)
-        for name in ("CONCEPT.csv", "CONCEPT_RELATIONSHIP.csv")
+        for name in VOCABULARY_FILES
     }
-    return {"raw": raw_files, "vocabulary": vocab_files}
+    return {
+        "raw": raw_files,
+        "vocabulary": vocab_files,
+        "vocabulary_identity": {
+            "fingerprint": vocabulary_identity["fingerprint"],
+            "version_label": vocabulary_identity["version_label"],
+        },
+        "mapping_rules": _optional_file_manifest(Path(MAPPING_RULES_PATH)),
+    }
 
 
 def get_git_commit():
@@ -244,6 +258,8 @@ def config_snapshot():
         "confidence_threshold": CONFIDENCE_THRESHOLD,
         "db_path": DB_PATH,
         "vocab_dir": VOCAB_DIR,
+        "vocab_manifest_path": VOCAB_MANIFEST_PATH,
+        "mapping_rules_path": MAPPING_RULES_PATH,
     }
 
 

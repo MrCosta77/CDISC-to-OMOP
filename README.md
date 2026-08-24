@@ -119,7 +119,18 @@ Or reject it:
 .\.venv\Scripts\python -m src.mapping.review_mappings reject 1 --reviewer "Reviewer Name" --reason "Candidate adds unsupported clinical specificity"
 ```
 Run `main.py` again after review. The next run applies only the active mappings in
-`approved_mapping_set`.
+`approved_mapping_set`. After approving or rejecting a proposal, export the
+active rules to the versioned, non-clinical artifact:
+```powershell
+.\.venv\Scripts\python -m src.mapping.review_mappings export-rules
+```
+Commit `resources/mapping_rules.json` with the review change. A fresh database
+imports this artifact automatically during `main.py`, before semantic mapping.
+The import is idempotent and refuses rules reviewed against a different Athena
+extract. It can also be tested explicitly:
+```powershell
+.\.venv\Scripts\python -m src.mapping.review_mappings import-rules
+```
 
 **9. Run RWE Analytics:**
 Generate cohort demographics, adverse event frequencies, and rescue medication phenotyping.
@@ -139,6 +150,23 @@ The file is exempt from Git end-of-line normalization so the official byte
 stream and its checksum remain identical on Windows and Unix checkouts.
 Logical OMOP `integer` fields are represented as DuckDB `BIGINT` so generated
 64-bit identifiers remain valid.
+
+## Athena Vocabulary Provenance
+
+The exact Athena extract loaded by the pipeline is pinned in
+`resources/athena_vocabulary_manifest.json`. It contains SHA-256 checksums for
+`CONCEPT`, `CONCEPT_RELATIONSHIP`, `VOCABULARY`, `DOMAIN`, `CONCEPT_CLASS`, and
+`RELATIONSHIP`, plus the individual vocabulary release labels from Athena.
+Every vocabulary load verifies all six files before replacing any database
+tables. `cdm_source.vocabulary_version`, portable mapping rules, and the run
+manifest use the resulting `Athena-<fingerprint>` identity.
+
+When Athena is intentionally replaced, generate a new manifest first:
+```powershell
+.\.venv\Scripts\python -c "from src.utils.config import VOCAB_DIR, VOCAB_MANIFEST_PATH; from src.utils.vocabulary_identity import write_vocabulary_manifest; print(write_vocabulary_manifest(VOCAB_DIR, VOCAB_MANIFEST_PATH)['version_label'])"
+```
+Existing rules will then fail closed until they are reviewed/exported against
+the new vocabulary identity; do not edit either fingerprint by hand.
 
 ## CDISC Type Concept Provenance
 

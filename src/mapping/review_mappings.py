@@ -14,7 +14,15 @@ from src.mapping.review_store import (
     record_mapping_decision,
     review_decision,
 )
-from src.utils.config import DB_PATH
+from src.mapping.rule_portability import (
+    export_mapping_rules,
+    import_mapping_rules,
+)
+from src.utils.config import (
+    DB_PATH,
+    MAPPING_RULES_PATH,
+    VOCAB_MANIFEST_PATH,
+)
 from src.utils.run_context import ensure_audit_schema
 
 
@@ -184,6 +192,16 @@ def build_parser():
         "rules", help="List the active approved and rejected mapping rules."
     )
 
+    export_parser = subparsers.add_parser(
+        "export-rules", help="Export active rules to the versioned JSON artifact."
+    )
+    export_parser.add_argument("--output", default=MAPPING_RULES_PATH)
+
+    import_rules_parser = subparsers.add_parser(
+        "import-rules", help="Import the versioned JSON rules into this database."
+    )
+    import_rules_parser.add_argument("--input", default=MAPPING_RULES_PATH)
+
     import_parser = subparsers.add_parser(
         "import-pending", help="Import legacy pending provenance for review."
     )
@@ -221,6 +239,21 @@ def main(argv=None):
             return
         if args.command == "rules":
             list_rules(con)
+            return
+        if args.command == "export-rules":
+            payload = export_mapping_rules(
+                con, args.output, VOCAB_MANIFEST_PATH
+            )
+            print(
+                f"Exported {len(payload['approved'])} approved and "
+                f"{len(payload['rejected'])} rejected rules to {args.output}."
+            )
+            return
+        if args.command == "import-rules":
+            result = import_mapping_rules(
+                con, args.input, VOCAB_MANIFEST_PATH
+            )
+            print(result)
             return
         if args.command == "import-pending":
             decision_ids = import_pending_provenance(con, args.run_id)

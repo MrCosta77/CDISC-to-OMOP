@@ -73,6 +73,10 @@ def main():
             ("src/utils/setup_cdm_schema.py", "0. Install OMOP CDM 5.4 Schema"),
             ("src/utils/setup_vocab.py", "0. Setup OMOP Vocabularies"),
             ("src/utils/setup_audit.py", "0b. Setup Audit and Provenance"),
+            (
+                "src/mapping/sync_mapping_rules.py",
+                "0c. Restore Versioned Human Mapping Rules",
+            ),
             ("src/etl/care_site.py", "1. Extract Study Sites (DM)"),
             ("src/etl/person.py", "2. Extract Demographics (DM)"),
             ("src/etl/condition.py", "3. Extract Conditions (AE + MH)"),

@@ -9,6 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 from src.utils.config import DB_PATH
 from src.utils.run_context import require_run_id
+from src.mapping.review_store import get_vocabulary_version
 
 def get_standard_concept(term, domain, con):
     """
@@ -71,10 +72,7 @@ def process_domain(
     mapping_dict = {}
     audit_records = []
     
-    try:
-        vocab_version = con.execute("SELECT vocabulary_version FROM vocabulary WHERE vocabulary_id = 'None'").fetchone()[0]
-    except:
-        vocab_version = 'Athena_Standard'
+    vocab_version = get_vocabulary_version(con)
 
     for term in unique_terms:
         concept_id, concept_name, method = get_standard_concept(term, domain_name, con)

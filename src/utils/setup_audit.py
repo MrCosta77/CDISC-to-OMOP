@@ -7,7 +7,8 @@ from datetime import datetime
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
-from src.utils.config import DB_PATH
+from src.utils.config import DB_PATH, VOCAB_MANIFEST_PATH
+from src.utils.vocabulary_identity import load_vocabulary_manifest
 from src.omop.cdm54 import create_table_sql, validate_table_schema
 from src.utils.run_context import ensure_audit_schema
 
@@ -26,17 +27,8 @@ def setup_audit_tables(db_path=DB_PATH):
             con.execute("DROP TABLE IF EXISTS cdm_source")
             con.execute(create_table_sql("cdm_source"))
         
-            # Tentar ler a versão do vocabulário dinamicamente
-            vocab_version = "Athena_Standard"
-            try:
-                res = con.execute(
-                    "SELECT vocabulary_version FROM vocabulary "
-                    "WHERE vocabulary_id = 'None'"
-                ).fetchone()
-                if res and res[0]:
-                    vocab_version = res[0]
-            except duckdb.CatalogException:
-                pass
+            vocabulary_identity = load_vocabulary_manifest(VOCAB_MANIFEST_PATH)
+            vocab_version = vocabulary_identity["version_label"]
 
             current_date = datetime.now().strftime("%Y-%m-%d")
         
