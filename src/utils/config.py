@@ -27,11 +27,17 @@ def env_flag(name, default=False):
         return False
     raise ValueError(f"{name} must be a boolean value.")
 
+
+def env_text(name, default):
+    """Use a non-blank environment value or a documented default."""
+    value = os.getenv(name)
+    return value.strip() if value and value.strip() else default
+
 # Fetch configurations from .env, with safe fallbacks
 DB_PATH = resolve_project_path(
     os.getenv("DB_PATH", str(PROJECT_ROOT / "data" / "cdisc_omop.duckdb"))
 )
-MODEL_NAME = os.getenv("MODEL_NAME", "qwen2.5-coder:7b")
+MODEL_NAME = env_text("MODEL_NAME", "qwen2.5-coder:7b")
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.90"))
 ALLOW_DIRTY_RUN = env_flag("ALLOW_DIRTY_RUN", False)
 VOCAB_DIR = resolve_project_path(

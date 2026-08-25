@@ -270,17 +270,23 @@ def review_decision(
     if concept_id == 0:
         raise ValueError("Approval requires a non-zero Standard Concept ID.")
     concept = con.execute("""
-        SELECT concept_name, domain_id, standard_concept, invalid_reason
+        SELECT concept_name, domain_id, standard_concept, invalid_reason,
+               CURRENT_DATE BETWEEN valid_start_date AND valid_end_date
         FROM concept
         WHERE concept_id = ?
     """, [str(concept_id)]).fetchone()
     if concept is None:
         raise ValueError(f"Concept {concept_id} does not exist.")
 
-    concept_name, domain_id, standard_concept, invalid_reason = concept
+    (
+        concept_name, domain_id, standard_concept, invalid_reason,
+        currently_valid,
+    ) = concept
     expected_domain = TARGET_DOMAINS[target_table]
     if standard_concept != "S" or invalid_reason not in {None, ""}:
         raise ValueError(f"Concept {concept_id} is not a valid Standard Concept.")
+    if not currently_valid:
+        raise ValueError(f"Concept {concept_id} is not currently valid.")
     if domain_id != expected_domain:
         raise ValueError(
             f"Concept {concept_id} belongs to {domain_id}, but {target_table} "

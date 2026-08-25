@@ -47,7 +47,7 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
 ## 🛠️ Pipeline Execution Flow
 
 1. **Phase 1: Isolated Schema, Vocabularies & Audit Setup** — Creates a run-specific candidate database beside the published file, installs the pinned 39-table OMOP CDM v5.4.3 contract, loads typed vocabularies, and builds audit metadata. The published database is not opened for writing.
-2. **Phase 2: Structural ETL** — Transforms raw CDISC domains (DM, AE, MH, EX, CM, LB, VS, EG, SV, DS) into OMOP clinical tables. De-identified `STUDYID + SITEID` values become `CARE_SITE` source keys linked from `PERSON`; no site name, location, or facility type is invented. Observation periods come from DM, actual visits come from SV, and event links are added only when the visit is explicit or temporally unambiguous. A record-level SDTM lineage bridge is generated before mapping.
+2. **Phase 2: Structural ETL** — Validates ten raw CDISC domains and transforms DM, AE, MH, EX, CM, LB, VS, EG and SV into OMOP clinical tables. DS is validation-only: its one final disposition record per subject verifies cohort coverage and timeline consistency, but no unsupported OMOP disposition record is invented. De-identified `STUDYID + SITEID` values become `CARE_SITE` source keys linked from `PERSON`; no site name, location, or facility type is invented. Observation periods come from DM, actual visits come from SV, and event links are added only when the visit is explicit or temporally unambiguous. A record-level SDTM lineage bridge is generated before mapping.
 3. **Phase 3: Semantic Mapping** — Applies deterministic mappings and previously approved human mappings. The LLM only proposes candidates for the remaining orphan terms; pending proposals stay as concept ID `0` in the published clinical tables.
 4. **Phase 4: Validated Publication** — Loads CSV outputs into temporary staging tables, casts them into the official contract, validates required fields, keys, dates, concepts, relations, and complete lineage coverage, and records success in the candidate. Only then does the orchestrator atomically replace `cdisc_omop.duckdb` at file level. Any exception removes the candidate and preserves the previous database.
 
@@ -103,7 +103,8 @@ database.
 
 The orchestrator validates all ten SDTM input contracts before ETL, including
 CDISC Race terminology and the consistency of `STUDYID`, `SITEID`, `SUBJID`,
-and `USUBJID`. To run this
+and `USUBJID`. DS participates in this acceptance gate but is not directly
+published to an OMOP clinical table. To run this
 gate independently:
 ```powershell
 .\.venv\Scripts\python -m src.quality.validate_cdisc_inputs

@@ -39,11 +39,14 @@ def _create_concepts(con):
             concept_name VARCHAR,
             domain_id VARCHAR,
             standard_concept VARCHAR,
-            invalid_reason VARCHAR
+            invalid_reason VARCHAR,
+            valid_start_date DATE,
+            valid_end_date DATE
         )
     """)
     con.execute(
-        "INSERT INTO concept VALUES ('1125315', 'Acetaminophen', 'Drug', 'S', NULL)"
+        "INSERT INTO concept VALUES ('1125315', 'Acetaminophen', 'Drug', 'S', "
+        "NULL, '1970-01-01', '2099-12-31')"
     )
 
 
@@ -130,6 +133,13 @@ def test_reviewed_rules_round_trip_into_clean_database(tmp_path):
         assert target.execute(
             "SELECT COUNT(*) FROM mapping_decision"
         ).fetchone()[0] == 2
+
+        target.execute(
+            "UPDATE concept SET valid_end_date = '2000-12-31' "
+            "WHERE concept_id = '1125315'"
+        )
+        with pytest.raises(ValueError, match="not currently valid"):
+            import_mapping_rules(target, rules_path, manifest_path)
 
 
 def test_rules_reject_a_different_vocabulary(tmp_path):

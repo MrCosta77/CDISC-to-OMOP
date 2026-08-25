@@ -19,11 +19,15 @@ def _create_concepts(con):
             concept_name VARCHAR,
             domain_id VARCHAR,
             standard_concept VARCHAR,
-            invalid_reason VARCHAR
+            invalid_reason VARCHAR,
+            valid_start_date DATE,
+            valid_end_date DATE
         )
     """)
     con.executemany("""
-        INSERT INTO concept VALUES (?, ?, ?, 'S', NULL)
+        INSERT INTO concept VALUES (
+            ?, ?, ?, 'S', NULL, '1970-01-01', '2099-12-31'
+        )
     """, [
         ("320128", "Essential hypertension", "Condition"),
         ("4223659", "Fatigue", "Observation"),
@@ -103,6 +107,35 @@ def test_proposal_is_not_provenance_and_wrong_domain_cannot_be_approved():
             WHERE target_table = 'condition_occurrence'
               AND normalized_value = 'hypertension'
         """).fetchone()[0] is False
+
+
+def test_expired_standard_concept_cannot_be_approved():
+    with duckdb.connect(":memory:") as con:
+        _create_concepts(con)
+        ensure_audit_schema(con)
+        con.execute(
+            "UPDATE concept SET valid_end_date = '2000-12-31' "
+            "WHERE concept_id = '320128'"
+        )
+        decision_id = record_mapping_decision(
+            con,
+            run_id="RUN-EXPIRED",
+            target_table="condition_occurrence",
+            source_value="Hypertension",
+            proposed_concept_id=320128,
+            score=1.0,
+            model_name="test-model",
+            vocabulary_version="test-vocab",
+            affected_target_ids=[1],
+        )
+        with pytest.raises(ValueError, match="not currently valid"):
+            review_decision(
+                con,
+                decision_id,
+                action="approve",
+                reviewer="QC Reviewer",
+                reason="Expired concept regression test",
+            )
 
 
 def test_only_approved_mapping_is_applied_and_audited(tmp_path):

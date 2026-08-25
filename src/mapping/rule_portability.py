@@ -121,14 +121,17 @@ def _validate_rule(rule, *, approved):
 
 def _validate_concept(con, target_table, concept_id):
     concept = con.execute("""
-        SELECT domain_id, standard_concept, invalid_reason
+        SELECT domain_id, standard_concept, invalid_reason,
+               CURRENT_DATE BETWEEN valid_start_date AND valid_end_date
         FROM concept WHERE concept_id = ?
     """, [str(concept_id)]).fetchone()
     if concept is None:
         raise ValueError(f"Ruleset concept {concept_id} does not exist.")
-    domain_id, standard_concept, invalid_reason = concept
+    domain_id, standard_concept, invalid_reason, currently_valid = concept
     if standard_concept != "S" or invalid_reason not in {None, ""}:
         raise ValueError(f"Ruleset concept {concept_id} is not a valid Standard Concept.")
+    if not currently_valid:
+        raise ValueError(f"Ruleset concept {concept_id} is not currently valid.")
     if domain_id != TARGET_DOMAINS[target_table]:
         raise ValueError(
             f"Ruleset concept {concept_id} belongs to {domain_id}, but "
