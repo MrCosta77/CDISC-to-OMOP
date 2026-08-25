@@ -29,15 +29,24 @@ def get_standard_concept(term, domain, con):
           AND (invalid_reason IS NULL OR invalid_reason = '')
           AND CURRENT_DATE BETWEEN valid_start_date AND valid_end_date
         ORDER BY concept_id
-        LIMIT 1
+        LIMIT 2
     """
-    res = con.execute(query_direct, (term_lower, domain)).fetchone()
-    if res:
-        return res[0], res[1], "deterministic_direct_match"
+    direct_matches = con.execute(
+        query_direct,
+        (term_lower, domain),
+    ).fetchall()
+    if len(direct_matches) == 1:
+        return (
+            direct_matches[0][0],
+            direct_matches[0][1],
+            "deterministic_direct_match",
+        )
+    if len(direct_matches) > 1:
+        return 0, None, "ambiguous_direct_match"
         
     # Strategy 2: Match to a Non-Standard Concept, then follow 'Maps to'
     query_maps_to = """
-        SELECT c2.concept_id, c2.concept_name
+        SELECT DISTINCT c2.concept_id, c2.concept_name
         FROM concept c1
         JOIN concept_relationship cr ON c1.concept_id = cr.concept_id_1
         JOIN concept c2 ON cr.concept_id_2 = c2.concept_id
@@ -52,11 +61,20 @@ def get_standard_concept(term, domain, con):
           AND (c2.invalid_reason IS NULL OR c2.invalid_reason = '')
           AND CURRENT_DATE BETWEEN c2.valid_start_date AND c2.valid_end_date
         ORDER BY c2.concept_id
-        LIMIT 1
+        LIMIT 2
     """
-    res = con.execute(query_maps_to, (term_lower, domain)).fetchone()
-    if res:
-        return res[0], res[1], "deterministic_maps_to_relation"
+    maps_to_matches = con.execute(
+        query_maps_to,
+        (term_lower, domain),
+    ).fetchall()
+    if len(maps_to_matches) == 1:
+        return (
+            maps_to_matches[0][0],
+            maps_to_matches[0][1],
+            "deterministic_maps_to_relation",
+        )
+    if len(maps_to_matches) > 1:
+        return 0, None, "ambiguous_maps_to_relation"
         
     return 0, None, None
 
@@ -71,11 +89,14 @@ def process_domain(
         
     mapping_dict = {}
     audit_records = []
+    ambiguous_terms = []
     
     vocab_version = get_vocabulary_version(con)
 
     for term in unique_terms:
         concept_id, concept_name, method = get_standard_concept(term, domain_name, con)
+        if method and method.startswith("ambiguous_"):
+            ambiguous_terms.append(str(term))
         if concept_id != 0:
             mapping_dict[term] = concept_id
             
@@ -112,6 +133,12 @@ def process_domain(
             """, audit_records)
             
     print(f"[{domain_name}] Successfully mapped {len(mapping_dict)} out of {len(unique_terms)} unique terms deterministically.")
+    if ambiguous_terms:
+        print(
+            f"[{domain_name}] Left {len(ambiguous_terms)} ambiguous exact/Maps To "
+            "term(s) for guarded proposal and human review: "
+            + ", ".join(sorted(ambiguous_terms))
+        )
     return df, len(mapping_dict)
 
 def run_deterministic_mapping():

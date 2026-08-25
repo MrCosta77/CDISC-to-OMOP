@@ -10,7 +10,7 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
 
 ## 🚀 Core Architecture & Engineering Highlights
 
-* **Hybrid Semantic Mapping with Guardrails:** Combines deterministic matching through official OHDSI `Maps To` relationships with local LLM candidate proposals. LLM proposals never update clinical tables directly.
+* **Hybrid Semantic Mapping with Guardrails:** Combines deterministic matching through official OHDSI `Maps To` relationships with local LLM candidate proposals. A deterministic mapping is applied only when the valid Standard target is unique; ambiguous exact names or `Maps To` targets remain concept ID `0` for guarded proposal and human review. LLM proposals never update clinical tables directly.
 * **Human Review Gate:** AI proposals are stored in `mapping_decision`, linked to affected events, and must be explicitly approved before entering `approved_mapping_set`. Only approved mappings are applied on a subsequent run and recorded in `mapping_provenance`.
 * **Reproducible Candidate Selection:** Deterministic and retrieval candidates exclude invalid or expired concepts and relationships, use stable Concept ID tie-breaking, and record the vocabulary, prompt and run versions. The configured confidence threshold classifies low-confidence candidates before review.
 * **Reusable Human Policy:** Active approvals are applied before the LLM phase; active rejections are detected before retrieval, so previously rejected terms do not call the model again. AE mapping uses controlled `AEDECOD` while retaining verbatim `AETERM`; CM mapping uses normalized `CMDECOD` while retaining verbatim `CMTRT`.

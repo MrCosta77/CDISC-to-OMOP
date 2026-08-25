@@ -78,7 +78,8 @@ def get_candidates_from_db_safe(term, con, domain_id):
           CASE WHEN REGEXP_REPLACE(
               LOWER(concept_name), '[^a-z0-9]', '', 'g'
           ) LIKE ? THEN 0 ELSE 1 END,
-          LENGTH(concept_name)
+          LENGTH(concept_name),
+          CAST(concept_id AS BIGINT)
         LIMIT 1000
     """
 
@@ -91,7 +92,7 @@ def get_candidates_from_db_safe(term, con, domain_id):
     candidates = con.execute(query, full_params).fetchall()
     return sorted(
         candidates,
-        key=lambda row: _candidate_rank(term, row[1]),
+        key=lambda row: (*_candidate_rank(term, row[1]), -int(row[0])),
         reverse=True,
     )[:15]
 

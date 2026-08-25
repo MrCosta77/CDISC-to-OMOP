@@ -43,3 +43,23 @@ def test_rr_abbreviation_outranks_unrelated_duration_candidate():
 
     assert int(candidates[0][0]) == 3013078
     assert candidates[0][1] == "R-R interval by EKG"
+
+
+def test_equal_candidate_names_use_stable_concept_id_tiebreak():
+    with _concept_connection() as con:
+        con.executemany("""
+            INSERT INTO concept VALUES (
+                ?, 'Systolic blood pressure', 'Measurement', 'S', NULL,
+                '1970-01-01', '2099-12-31'
+            )
+        """, [(4152194,), (3004249,)])
+        candidates = get_candidates_from_db_safe(
+            "Systolic blood pressure", con, "Measurement"
+        )
+
+    matching_ids = [
+        int(concept_id)
+        for concept_id, name in candidates
+        if name == "Systolic blood pressure"
+    ]
+    assert matching_ids == [3004249, 4152194]

@@ -71,7 +71,7 @@ def test_deterministic_mapping_records_run_id_without_duplicates():
     assert audit == ("RUN-TEST", 320128, "Athena-test123456", 1)
 
 
-def test_deterministic_mapping_ignores_expired_concepts_and_breaks_ties():
+def test_deterministic_mapping_ignores_expired_concepts_and_rejects_ambiguity():
     with duckdb.connect(":memory:") as con:
         con.execute("""
             CREATE TABLE concept (
@@ -94,4 +94,39 @@ def test_deterministic_mapping_ignores_expired_concepts_and_breaks_ties():
 
         result = get_standard_concept("Same term", "Condition", con)
 
-    assert result == (10, "Same term", "deterministic_direct_match")
+    assert result == (0, None, "ambiguous_direct_match")
+
+
+def test_deterministic_mapping_rejects_ambiguous_maps_to_targets():
+    with duckdb.connect(":memory:") as con:
+        con.execute("""
+            CREATE TABLE concept (
+                concept_id INTEGER, concept_name VARCHAR, domain_id VARCHAR,
+                standard_concept VARCHAR, invalid_reason VARCHAR,
+                valid_start_date DATE, valid_end_date DATE
+            )
+        """)
+        con.executemany("""
+            INSERT INTO concept VALUES (?, ?, ?, ?, NULL,
+                                        '1970-01-01', '2099-12-31')
+        """, [
+            (1, "Source term", "Condition", None),
+            (10, "Target one", "Condition", "S"),
+            (20, "Target two", "Condition", "S"),
+        ])
+        con.execute("""
+            CREATE TABLE concept_relationship (
+                concept_id_1 INTEGER, concept_id_2 INTEGER,
+                relationship_id VARCHAR, invalid_reason VARCHAR,
+                valid_start_date DATE, valid_end_date DATE
+            )
+        """)
+        con.executemany("""
+            INSERT INTO concept_relationship VALUES (
+                1, ?, 'Maps to', NULL, '1970-01-01', '2099-12-31'
+            )
+        """, [(10,), (20,)])
+
+        result = get_standard_concept("Source term", "Condition", con)
+
+    assert result == (0, None, "ambiguous_maps_to_relation")
