@@ -10,15 +10,19 @@ sys.path.append(str(PROJECT_ROOT))
 
 # 1. IMPORT OUR PROFESSIONAL LOGGER
 from src.utils.logger import get_logger
+from src.utils.atomic_database import atomic_database_candidate
+from src.utils.config import DB_PATH
 from src.utils.run_context import (
     RUN_ID_ENV,
     collect_output_counts,
+    config_snapshot,
     finish_pipeline_run,
     generate_run_id,
     start_pipeline_run,
     validate_required_inputs,
 )
 from src.quality.validate_cdisc_inputs import validate_cdisc_inputs
+from src.etl.build_database import validate_published_database
 
 # 2. INITIALIZE THE ORCHESTRATOR LOGGER
 logger = get_logger("Orchestrator")
@@ -63,8 +67,8 @@ def main():
     logger.info("🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥")
 
     total_start = time.time()
+    final_db_path = Path(DB_PATH).absolute()
     try:
-        start_pipeline_run(run_id)
         validate_required_inputs()
         input_counts = validate_cdisc_inputs()
         logger.info(f"CDISC input contracts accepted: {input_counts}")
@@ -99,19 +103,60 @@ def main():
             ("src/mapping/llm_measurement.py", "12. AI Proposals (Measurements)"),
             ("src/etl/build_database.py", "13. Build Unified DuckDB Database"),
         ]
-        for script_path, step_name in steps:
-            run_script(script_path, step_name, run_id)
+        with atomic_database_candidate(final_db_path, run_id) as candidate_path:
+            previous_db_path = os.environ.get("DB_PATH")
+            os.environ["DB_PATH"] = str(candidate_path)
+            run_started = False
+            try:
+                snapshot = config_snapshot()
+                snapshot.update({
+                    "publication_mode": "atomic_candidate",
+                    "publication_target": str(final_db_path),
+                    "candidate_path": str(candidate_path),
+                })
+                start_pipeline_run(
+                    run_id,
+                    db_path=candidate_path,
+                    snapshot=snapshot,
+                )
+                run_started = True
+                for script_path, step_name in steps:
+                    run_script(script_path, step_name, run_id)
 
-        output_counts = collect_output_counts()
-        finish_pipeline_run(run_id, "SUCCESS", output_counts=output_counts)
+                validate_published_database(candidate_path)
+                output_counts = collect_output_counts(candidate_path)
+                finish_pipeline_run(
+                    run_id,
+                    "SUCCESS",
+                    output_counts=output_counts,
+                    db_path=candidate_path,
+                )
+            except BaseException as exc:
+                if run_started and candidate_path.is_file():
+                    try:
+                        finish_pipeline_run(
+                            run_id,
+                            "FAILED",
+                            error_message=str(exc),
+                            db_path=candidate_path,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Could not persist FAILED status in candidate database."
+                        )
+                raise
+            finally:
+                if previous_db_path is None:
+                    os.environ.pop("DB_PATH", None)
+                else:
+                    os.environ["DB_PATH"] = previous_db_path
+
         total_elapsed = time.time() - total_start
         logger.info(f"🎉 PIPELINE FULLY COMPLETED IN {total_elapsed:.1f}s! 🎉")
-        logger.info(f"Run {run_id} published successfully.\n")
+        logger.info(
+            f"Run {run_id} atomically published to {final_db_path}.\n"
+        )
     except BaseException as exc:
-        try:
-            finish_pipeline_run(run_id, "FAILED", error_message=str(exc))
-        except Exception:
-            logger.exception("Could not persist the FAILED run status.")
         logger.exception(f"Pipeline run {run_id} failed.")
         raise
 

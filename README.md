@@ -15,6 +15,7 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
 * **Reproducible Candidate Selection:** Deterministic and retrieval candidates exclude invalid or expired concepts and relationships, use stable Concept ID tie-breaking, and record the vocabulary, prompt and run versions. The configured confidence threshold classifies low-confidence candidates before review.
 * **Reusable Human Policy:** Active approvals are applied before the LLM phase; active rejections are detected before retrieval, so previously rejected terms do not call the model again. AE mapping uses controlled `AEDECOD` while retaining verbatim `AETERM`; CM mapping uses normalized `CMDECOD` while retaining verbatim `CMTRT`.
 * **Pinned OMOP Schema:** Installs all 39 tables from the OHDSI CDM v5.4.3 field specification. Populated tables use explicit DuckDB types, required fields, primary keys, staging tables, and relational acceptance checks.
+* **Globally Atomic Database Builds:** Every `main.py` run builds the schema, Athena vocabularies, audit metadata, mapping decisions, clinical tables, and lineage in an isolated DuckDB candidate. The published database is replaced at file level only after the complete candidate passes validation; a failed run leaves the previous database untouched.
 * **Explicit Trial Provenance:** Clinical SDTM records, including actual visits from SV, use the Standard `Case Report Form` Type Concept. Observation periods derived from the DM reference period use `Standard algorithm`; the source-to-type matrix is centralized and tested.
 * **Record-Level SDTM Lineage:** Every published person, observation period, visit, condition, drug, and measurement has exactly one validated row in `source_record_lineage`, preserving the SDTM domain, subject, sequence/key, source file, verbatim value, mapping value, and publication `run_id`. Drug rows additionally distinguish a source-recorded end from an administratively censored or convention-derived OMOP end date.
 * **Explicit Unit and Source Semantics:** CDISC units are mapped through a reviewed, case-sensitive dictionary to Standard `Unit` Concepts. A supplied but unknown unit is published as concept ID `0`, while a genuinely absent unit remains `NULL`; original values and source concept fields are retained explicitly.
@@ -39,16 +40,16 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
   * `llm_*.py`: AI semantic agents for distinct clinical domains.
 * `src/analytics/`: RWE analytical scripts (`rwe_queries.py`).
 * `src/quality/`: Standalone acceptance checks for the published CDM.
-* `src/utils/`: Configuration (`config.py`), central algorithms (`helpers.py`), audit setup (`setup_audit.py`), and standardized logging (`logger.py`).
+* `src/utils/`: Configuration (`config.py`), central algorithms (`helpers.py`), file-level atomic publication (`atomic_database.py`), audit setup (`setup_audit.py`), and standardized logging (`logger.py`).
 * `tests/`: Pytest suites verifying core data engineering functions.
 * `main.py`: Idempotent orchestrator with a unique `run_id` and run-level audit trail.
 
 ## 🛠️ Pipeline Execution Flow
 
-1. **Phase 1: Schema, Vocabularies & Audit Setup** — Installs the pinned 39-table OMOP CDM v5.4.3 contract, loads typed vocabularies, and builds audit metadata.
+1. **Phase 1: Isolated Schema, Vocabularies & Audit Setup** — Creates a run-specific candidate database beside the published file, installs the pinned 39-table OMOP CDM v5.4.3 contract, loads typed vocabularies, and builds audit metadata. The published database is not opened for writing.
 2. **Phase 2: Structural ETL** — Transforms raw CDISC domains (DM, AE, MH, EX, CM, LB, VS, EG, SV, DS) into OMOP clinical tables. De-identified `STUDYID + SITEID` values become `CARE_SITE` source keys linked from `PERSON`; no site name, location, or facility type is invented. Observation periods come from DM, actual visits come from SV, and event links are added only when the visit is explicit or temporally unambiguous. A record-level SDTM lineage bridge is generated before mapping.
 3. **Phase 3: Semantic Mapping** — Applies deterministic mappings and previously approved human mappings. The LLM only proposes candidates for the remaining orphan terms; pending proposals stay as concept ID `0` in the published clinical tables.
-4. **Phase 4: Validated Publication** — Loads CSV outputs into temporary staging tables, casts them into the official contract, validates required fields, keys, dates, concepts, relations, and complete lineage coverage, then atomically publishes `cdisc_omop.duckdb` together with `source_record_lineage`.
+4. **Phase 4: Validated Publication** — Loads CSV outputs into temporary staging tables, casts them into the official contract, validates required fields, keys, dates, concepts, relations, and complete lineage coverage, and records success in the candidate. Only then does the orchestrator atomically replace `cdisc_omop.duckdb` at file level. Any exception removes the candidate and preserves the previous database.
 
 ## ⚙️ How to Reproduce
 
@@ -83,9 +84,17 @@ Ensure your source `.sas7bdat` files and OHDSI vocabularies are inside the `data
 ```bash
 .\.venv\Scripts\python main.py
 ```
-Each execution receives a unique `run_id`. Its status, input manifest, Git commit,
-configuration snapshot, output counts, error (if any), and mapping provenance are
-stored in DuckDB. Track execution in real time or inspect `logs/pipeline.log`.
+Each execution receives a unique `run_id`. A successfully published run stores
+its status, input manifest, Git commit, configuration snapshot, output counts,
+and mapping provenance in DuckDB. Failed candidates are deliberately discarded
+so they cannot alter the published database; their step and error trail remains
+available in `logs/pipeline.log`.
+
+The build temporarily requires enough free disk space for the published database
+and one complete candidate. On Windows, close RStudio, database browsers, or
+other processes holding `cdisc_omop.duckdb` open before final publication. If
+the replacement is blocked, the run fails without overwriting the previous
+database.
 
 The orchestrator validates all ten SDTM input contracts before ETL, including
 CDISC Race terminology and the consistency of `STUDYID`, `SITEID`, `SUBJID`,
