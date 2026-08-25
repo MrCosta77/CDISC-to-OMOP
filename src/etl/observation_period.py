@@ -50,7 +50,12 @@ def run_observation_period_etl(dm_path=None, output_path=None):
         'observation_period_end_date': df_dm['end_date'].dt.date,
         'period_type_concept_id': type_concept_id_for(
             'observation_period', 'DERIVED'
-        )
+        ),
+        'source_domain': 'DM',
+        'source_subject_id': df_dm['USUBJID'],
+        'source_record_key': 'USUBJID=' + df_dm['USUBJID'].astype(str),
+        'source_record_value': df_dm['USUBJID'],
+        'mapping_source_value': None,
     })
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

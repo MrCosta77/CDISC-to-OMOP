@@ -24,7 +24,8 @@ def test_measurement_etl_recovers_legacy_eg_output(monkeypatch, tmp_path):
     legacy_eg = pd.DataFrame(
         [
             {
-                "USUBJID": "CDISC-01-701-002",
+                    "USUBJID": "CDISC-01-701-002",
+                    "EGSEQ": 1,
                 "EGDTC": "23020",
                 "EGTEST": "Heart Rate",
                 "EGORRES": "69",

@@ -46,9 +46,22 @@ def run_visit_etl(sv_path=None, output_path=None):
     df_visits['visit_end_date'] = df_visits['end_date'].dt.strftime('%Y-%m-%d')
     df_visits['visit_type_concept_id'] = type_concept_id_for('visit_occurrence', 'SV')
     df_visits['visit_source_value'] = df_visits['VISIT'].astype(str).str.strip()
+    df_visits['source_domain'] = 'SV'
+    df_visits['source_subject_id'] = df_visits['USUBJID']
+    df_visits['source_record_key'] = df_visits['source_visit_num'].map(
+        lambda value: f"VISITNUM={int(value)}"
+    )
+    df_visits['source_record_value'] = df_visits['visit_source_value']
+    df_visits['mapping_source_value'] = None
     
     # Reorder columns
-    final_cols = ['visit_occurrence_id', 'person_id', 'visit_concept_id', 'visit_start_date', 'visit_end_date', 'visit_type_concept_id', 'visit_source_value', 'source_visit_num']
+    final_cols = [
+        'visit_occurrence_id', 'person_id', 'visit_concept_id',
+        'visit_start_date', 'visit_end_date', 'visit_type_concept_id',
+        'visit_source_value', 'source_visit_num', 'source_domain',
+        'source_subject_id', 'source_record_key', 'source_record_value',
+        'mapping_source_value',
+    ]
     df_visits = df_visits[final_cols]
     
     # Ensure integers are clean

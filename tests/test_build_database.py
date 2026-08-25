@@ -80,6 +80,46 @@ def _write_valid_outputs(processed_dir):
         "value_source_value": ["1.0"],
         "visit_occurrence_id": [10],
     }).to_csv(processed_dir / "MEASUREMENT.csv", index=False)
+    pd.DataFrame([
+        {
+            "run_id": "RUN-TEST", "target_table": "person", "target_id": 1,
+            "person_id": 1, "source_domain": "DM", "source_file": "dm.sas7bdat",
+            "source_subject_id": "SUBJ-1", "source_record_key": "USUBJID=SUBJ-1",
+            "source_value": "SUBJ-1", "mapping_source_value": None,
+        },
+        {
+            "run_id": "RUN-TEST", "target_table": "observation_period", "target_id": 1,
+            "person_id": 1, "source_domain": "DM", "source_file": "dm.sas7bdat",
+            "source_subject_id": "SUBJ-1", "source_record_key": "USUBJID=SUBJ-1",
+            "source_value": "SUBJ-1", "mapping_source_value": None,
+        },
+        {
+            "run_id": "RUN-TEST", "target_table": "visit_occurrence", "target_id": 10,
+            "person_id": 1, "source_domain": "SV", "source_file": "sv.sas7bdat",
+            "source_subject_id": "SUBJ-1", "source_record_key": "VISITNUM=1",
+            "source_value": "Visit 1", "mapping_source_value": None,
+        },
+        {
+            "run_id": "RUN-TEST", "target_table": "condition_occurrence", "target_id": 20,
+            "person_id": 1, "source_domain": "AE", "source_file": "ae.sas7bdat",
+            "source_subject_id": "SUBJ-1", "source_record_key": "AESEQ=1",
+            "source_value": "Headache", "mapping_source_value": "HEADACHE",
+        },
+        {
+            "run_id": "RUN-TEST", "target_table": "drug_exposure", "target_id": 30,
+            "person_id": 1, "source_domain": "CM", "source_file": "cm.sas7bdat",
+            "source_subject_id": "SUBJ-1", "source_record_key": "CMSEQ=1",
+            "source_value": "Paracetamol", "mapping_source_value": "ACETAMINOPHEN",
+            "source_end_date": None, "published_end_date": "2023-01-31",
+            "end_date_derivation": "ADMINISTRATIVE_CENSORING_RFENDTC",
+        },
+        {
+            "run_id": "RUN-TEST", "target_table": "measurement", "target_id": 40,
+            "person_id": 1, "source_domain": "LB", "source_file": "lb.sas7bdat",
+            "source_subject_id": "SUBJ-1", "source_record_key": "LBSEQ=1",
+            "source_value": "Glucose", "mapping_source_value": "Glucose",
+        },
+    ]).to_csv(processed_dir / "SOURCE_RECORD_LINEAGE.csv", index=False)
 
 
 def test_database_build_publishes_all_tables(tmp_path):
@@ -114,6 +154,18 @@ def test_database_build_publishes_all_tables(tmp_path):
                 "PRAGMA table_info('measurement')"
             ).fetchall()
         ] == expected_columns("measurement")
+        assert con.execute(
+            "SELECT COUNT(*) FROM source_record_lineage"
+        ).fetchone()[0] == 6
+        assert con.execute("""
+            SELECT source_end_date, published_end_date, end_date_derivation
+            FROM source_record_lineage
+            WHERE target_table = 'drug_exposure'
+        """).fetchone() == (
+            None,
+            pd.Timestamp("2023-01-31").date(),
+            "ADMINISTRATIVE_CENSORING_RFENDTC",
+        )
 
     with duckdb.connect(str(db_path)) as con:
         with pytest.raises(duckdb.ConstraintException):
@@ -127,6 +179,28 @@ def test_database_build_publishes_all_tables(tmp_path):
     acceptance = validate_published_database(db_path)
     assert acceptance["schema_table_count"] == 39
     assert acceptance["row_counts"]["measurement"] == 1
+    assert acceptance["extension_counts"]["source_record_lineage"] == 6
+
+
+def test_incomplete_lineage_rolls_back_publication(tmp_path):
+    processed_dir = tmp_path / "processed"
+    processed_dir.mkdir()
+    _write_valid_outputs(processed_dir)
+    lineage_path = processed_dir / "SOURCE_RECORD_LINEAGE.csv"
+    lineage = pd.read_csv(lineage_path)
+    lineage = lineage[lineage["target_table"] != "measurement"]
+    lineage.to_csv(lineage_path, index=False)
+
+    db_path = tmp_path / "omop.duckdb"
+    with duckdb.connect(str(db_path)) as con:
+        con.execute("CREATE TABLE person (person_id BIGINT)")
+        con.execute("INSERT INTO person VALUES (7)")
+
+    with pytest.raises(ValueError, match="Lineage coverage failed"):
+        build_omop_database(db_path=db_path, processed_dir=processed_dir)
+
+    with duckdb.connect(str(db_path), read_only=True) as con:
+        assert con.execute("SELECT person_id FROM person").fetchall() == [(7,)]
 
 
 def test_missing_output_aborts_before_existing_database_is_changed(tmp_path):

@@ -32,7 +32,7 @@ from src.mapping import llm_condition, llm_drug, llm_measurement
             "run_llm_drug_mapping",
             "DRUG_EXPOSURE.csv",
             "drug_exposure_id",
-            "drug_source_value",
+            "drug_mapping_value",
             "drug_concept_id",
             "drug_exposure",
         ),

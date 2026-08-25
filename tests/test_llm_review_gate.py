@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from src.mapping.apply_approved_mappings import apply_approved_mappings
-from src.mapping.review_mappings import list_rules
+from src.mapping.review_mappings import create_manual_proposal, list_rules
 from src.mapping.review_store import (
     get_active_mapping_rule,
     record_mapping_decision,
@@ -255,3 +255,37 @@ def test_threshold_and_active_rejection_are_machine_readable():
 
     assert status == "REJECTED"
     assert rule[0] == "QC Reviewer"
+
+
+def test_manual_review_resolves_events_through_published_lineage():
+    with duckdb.connect(":memory:") as con:
+        _create_concepts(con)
+        ensure_audit_schema(con)
+        con.execute("""
+            CREATE TABLE source_record_lineage (
+                target_table VARCHAR,
+                target_id BIGINT,
+                mapping_source_value VARCHAR
+            )
+        """)
+        con.executemany(
+            "INSERT INTO source_record_lineage VALUES (?, ?, ?)",
+            [
+                ("condition_occurrence", 41, "Hypertension"),
+                ("condition_occurrence", 42, "Hypertension"),
+            ],
+        )
+
+        decision_id = create_manual_proposal(
+            con,
+            "RUN-LINEAGE-REVIEW",
+            "condition_occurrence",
+            "Hypertension",
+            320128,
+        )
+        targets = con.execute("""
+            SELECT target_id FROM mapping_decision_event
+            WHERE mapping_decision_id = ? ORDER BY target_id
+        """, [decision_id]).fetchall()
+
+    assert targets == [(41,), (42,)]

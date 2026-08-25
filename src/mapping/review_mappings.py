@@ -31,7 +31,7 @@ TARGET_COLUMNS = {
         "condition_occurrence_id",
         "condition_source_value",
     ),
-    "drug_exposure": ("drug_exposure_id", "drug_source_value"),
+    "drug_exposure": ("drug_exposure_id", "drug_mapping_value"),
     "measurement": ("measurement_id", "measurement_source_value"),
 }
 
@@ -152,14 +152,29 @@ def list_rules(con):
 def create_manual_proposal(con, run_id, target_table, source_value, concept_id):
     run_id = _resolve_run_id(con, run_id)
     id_column, source_column = TARGET_COLUMNS[target_table]
-    target_ids = [
-        row[0]
-        for row in con.execute(
-            f'SELECT "{id_column}" FROM "{target_table}" '
-            f'WHERE "{source_column}" = ? ORDER BY "{id_column}"',
-            [source_value],
-        ).fetchall()
-    ]
+    has_lineage = con.execute("""
+        SELECT COUNT(*) FROM information_schema.tables
+        WHERE table_schema = 'main' AND table_name = 'source_record_lineage'
+    """).fetchone()[0]
+    if has_lineage:
+        target_ids = [
+            row[0]
+            for row in con.execute("""
+                SELECT target_id
+                FROM source_record_lineage
+                WHERE target_table = ? AND mapping_source_value = ?
+                ORDER BY target_id
+            """, [target_table, source_value]).fetchall()
+        ]
+    else:
+        target_ids = [
+            row[0]
+            for row in con.execute(
+                f'SELECT "{id_column}" FROM "{target_table}" '
+                f'WHERE "{source_column}" = ? ORDER BY "{id_column}"',
+                [source_value],
+            ).fetchall()
+        ]
     if not target_ids:
         raise ValueError(
             f"No {target_table} events were found for source value {source_value!r}."

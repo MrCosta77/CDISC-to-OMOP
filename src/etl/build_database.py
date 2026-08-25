@@ -31,6 +31,15 @@ PUBLICATION_FILES = {
     "drug_exposure": "DRUG_EXPOSURE.csv",
     "measurement": "MEASUREMENT.csv",
 }
+LINEAGE_FILE = "SOURCE_RECORD_LINEAGE.csv"
+LINEAGE_TARGETS = {
+    "person": "person_id",
+    "observation_period": "observation_period_id",
+    "visit_occurrence": "visit_occurrence_id",
+    "condition_occurrence": "condition_occurrence_id",
+    "drug_exposure": "drug_exposure_id",
+    "measurement": "measurement_id",
+}
 
 DOMAIN_FIELDS = {
     ("person", "gender_concept_id"): "Gender",
@@ -157,6 +166,87 @@ def _stage_into_candidate(con, table, csv_path):
             f"candidate={candidate_count}."
         )
     validate_table_schema(con, table, candidate)
+    return candidate, candidate_count
+
+
+def _stage_lineage_candidate(con, csv_path):
+    staging = _load_staging_table(con, "source_record_lineage", csv_path)
+    required = {
+        "run_id",
+        "target_table",
+        "target_id",
+        "person_id",
+        "source_domain",
+        "source_file",
+        "source_subject_id",
+        "source_record_key",
+        "source_value",
+        "mapping_source_value",
+        "source_end_date",
+        "published_end_date",
+        "end_date_derivation",
+    }
+    missing = sorted(required.difference(_table_columns(con, staging)))
+    if missing:
+        raise ValueError(
+            f"{csv_path.name} is missing lineage fields: " + ", ".join(missing)
+        )
+
+    candidate = "publish_source_record_lineage"
+    con.execute(f"DROP TABLE IF EXISTS {quote_identifier(candidate)}")
+    con.execute(f"""
+        CREATE TABLE {quote_identifier(candidate)} (
+            run_id VARCHAR NOT NULL,
+            target_table VARCHAR NOT NULL,
+            target_id BIGINT NOT NULL,
+            person_id BIGINT NOT NULL,
+            source_domain VARCHAR NOT NULL,
+            source_file VARCHAR NOT NULL,
+            source_subject_id VARCHAR NOT NULL,
+            source_record_key VARCHAR NOT NULL,
+            source_value VARCHAR,
+            mapping_source_value VARCHAR,
+            source_end_date DATE,
+            published_end_date DATE,
+            end_date_derivation VARCHAR,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (target_table, target_id)
+        )
+    """)
+    con.execute(f"""
+        INSERT INTO {quote_identifier(candidate)} (
+            run_id, target_table, target_id, person_id, source_domain,
+            source_file, source_subject_id, source_record_key, source_value,
+            mapping_source_value, source_end_date, published_end_date,
+            end_date_derivation
+        )
+        SELECT
+            NULLIF(run_id, ''),
+            NULLIF(target_table, ''),
+            CAST(NULLIF(TRIM(target_id), '') AS BIGINT),
+            CAST(NULLIF(TRIM(person_id), '') AS BIGINT),
+            NULLIF(source_domain, ''),
+            NULLIF(source_file, ''),
+            NULLIF(source_subject_id, ''),
+            NULLIF(source_record_key, ''),
+            NULLIF(source_value, ''),
+            NULLIF(mapping_source_value, ''),
+            CAST(NULLIF(source_end_date, '') AS DATE),
+            CAST(NULLIF(published_end_date, '') AS DATE),
+            NULLIF(end_date_derivation, '')
+        FROM {quote_identifier(staging)}
+    """)
+    staged_count = con.execute(
+        f"SELECT COUNT(*) FROM {quote_identifier(staging)}"
+    ).fetchone()[0]
+    candidate_count = con.execute(
+        f"SELECT COUNT(*) FROM {quote_identifier(candidate)}"
+    ).fetchone()[0]
+    if staged_count != candidate_count:
+        raise ValueError(
+            "Row-count mismatch for source_record_lineage: "
+            f"staged={staged_count}, candidate={candidate_count}."
+        )
     return candidate, candidate_count
 
 
@@ -363,6 +453,63 @@ def _validate_candidates(con, candidates):
     )
     _validate_concepts(con, candidates)
 
+
+def _validate_lineage(con, lineage, candidates):
+    unexpected = con.execute(f"""
+        SELECT DISTINCT target_table
+        FROM {quote_identifier(lineage)}
+        WHERE target_table NOT IN ({", ".join("?" for _ in LINEAGE_TARGETS)})
+    """, list(LINEAGE_TARGETS)).fetchall()
+    if unexpected:
+        raise ValueError(f"Unsupported lineage targets: {unexpected}")
+
+    run_count = con.execute(f"""
+        SELECT COUNT(DISTINCT run_id) FROM {quote_identifier(lineage)}
+    """).fetchone()[0]
+    if run_count != 1:
+        raise ValueError("Lineage must contain exactly one publication run_id.")
+
+    for target_table, id_column in LINEAGE_TARGETS.items():
+        physical = candidates[target_table]
+        lineage_count = con.execute(f"""
+            SELECT COUNT(*) FROM {quote_identifier(lineage)}
+            WHERE target_table = ?
+        """, [target_table]).fetchone()[0]
+        target_count = con.execute(
+            f"SELECT COUNT(*) FROM {quote_identifier(physical)}"
+        ).fetchone()[0]
+        if lineage_count != target_count:
+            raise ValueError(
+                f"Lineage coverage failed for {target_table}: "
+                f"lineage={lineage_count}, target={target_count}."
+            )
+
+        target_person = id_column if target_table == "person" else "person_id"
+        invalid = con.execute(f"""
+            SELECT COUNT(*)
+            FROM {quote_identifier(lineage)} l
+            LEFT JOIN {quote_identifier(physical)} t
+              ON l.target_id = t.{quote_identifier(id_column)}
+            WHERE l.target_table = ?
+              AND (
+                  t.{quote_identifier(id_column)} IS NULL
+                  OR l.person_id <> t.{quote_identifier(target_person)}
+              )
+        """, [target_table]).fetchone()[0]
+        if invalid:
+            raise ValueError(
+                f"Lineage integrity failed for {target_table}: {invalid} rows."
+            )
+
+    file_mismatches = con.execute(f"""
+        SELECT COUNT(*) FROM {quote_identifier(lineage)}
+        WHERE source_file <> LOWER(source_domain) || '.sas7bdat'
+    """).fetchone()[0]
+    if file_mismatches:
+        raise ValueError(
+            f"Lineage contains {file_mismatches} inconsistent source filenames."
+        )
+
 def build_omop_database(db_path=DB_PATH, processed_dir=None):
     print("🗄️ STARTING OMOP CDM 5.4 DATABASE PUBLICATION")
     print("-" * 70)
@@ -372,6 +519,8 @@ def build_omop_database(db_path=DB_PATH, processed_dir=None):
         table: processed_dir / filename
         for table, filename in PUBLICATION_FILES.items()
     }
+    lineage_path = processed_dir / LINEAGE_FILE
+    paths["source_record_lineage"] = lineage_path
     missing_files = [str(path) for path in paths.values() if not path.is_file()]
     if missing_files:
         raise FileNotFoundError(
@@ -387,13 +536,22 @@ def build_omop_database(db_path=DB_PATH, processed_dir=None):
             candidates = {}
             counts = {}
             for table, csv_path in paths.items():
+                if table == "source_record_lineage":
+                    continue
                 print(f"📦 Staging and validating {csv_path.name}...")
                 candidate, count = _stage_into_candidate(con, table, csv_path)
                 candidates[table] = candidate
                 counts[table] = count
 
-            _validate_candidates(con, candidates)
+            print(f"📦 Staging and validating {lineage_path.name}...")
+            lineage_candidate, lineage_count = _stage_lineage_candidate(
+                con, lineage_path
+            )
 
+            _validate_candidates(con, candidates)
+            _validate_lineage(con, lineage_candidate, candidates)
+
+            con.execute("DROP TABLE IF EXISTS source_record_lineage")
             for table in reversed(PUBLICATION_FILES):
                 con.execute(f"DROP TABLE IF EXISTS {quote_identifier(table)}")
             for table, candidate in candidates.items():
@@ -403,6 +561,14 @@ def build_omop_database(db_path=DB_PATH, processed_dir=None):
                 )
                 validate_table_schema(con, table)
                 print(f"   ✅ Published {counts[table]} records to {table}.")
+            con.execute(
+                f"ALTER TABLE {quote_identifier(lineage_candidate)} "
+                "RENAME TO source_record_lineage"
+            )
+            print(
+                f"   ✅ Published {lineage_count} records to "
+                "source_record_lineage."
+            )
             con.execute("COMMIT")
         except Exception:
             con.execute("ROLLBACK")
@@ -427,17 +593,24 @@ def validate_published_database(db_path=DB_PATH):
             raise ValueError("The OMOP CDM schema manifest is missing or invalid.")
         candidates = {table: table for table in PUBLICATION_FILES}
         _validate_candidates(con, candidates)
+        _validate_lineage(con, "source_record_lineage", candidates)
         counts = {
             table: con.execute(
                 f"SELECT COUNT(*) FROM {quote_identifier(table)}"
             ).fetchone()[0]
             for table in PUBLICATION_FILES
         }
+        lineage_count = con.execute(
+            "SELECT COUNT(*) FROM source_record_lineage"
+        ).fetchone()[0]
     return {
         "cdm_version": CDM_VERSION,
         "source_release": CDM_RELEASE,
         "schema_table_count": len(load_table_specs()),
         "row_counts": counts,
+        "extension_counts": {
+            "source_record_lineage": lineage_count
+        },
     }
 
 if __name__ == "__main__":

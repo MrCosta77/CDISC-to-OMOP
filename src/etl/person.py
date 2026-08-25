@@ -49,7 +49,12 @@ def run_etl_person(input_path, output_path):
             'person_source_value': row.get('USUBJID'),
             'gender_source_value': row.get('SEX'),
             'race_source_value': row.get('RACE'),
-            'ethnicity_source_value': row.get('ETHNIC')
+            'ethnicity_source_value': row.get('ETHNIC'),
+            'source_domain': 'DM',
+            'source_subject_id': row.get('USUBJID'),
+            'source_record_key': f"USUBJID={row.get('USUBJID')}",
+            'source_record_value': row.get('USUBJID'),
+            'mapping_source_value': None,
         }
         person_records.append(person)
 

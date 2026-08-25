@@ -13,9 +13,10 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
 * **Hybrid Semantic Mapping with Guardrails:** Combines deterministic matching through official OHDSI `Maps To` relationships with local LLM candidate proposals. LLM proposals never update clinical tables directly.
 * **Human Review Gate:** AI proposals are stored in `mapping_decision`, linked to affected events, and must be explicitly approved before entering `approved_mapping_set`. Only approved mappings are applied on a subsequent run and recorded in `mapping_provenance`.
 * **Reproducible Candidate Selection:** Deterministic and retrieval candidates exclude invalid or expired concepts and relationships, use stable Concept ID tie-breaking, and record the vocabulary, prompt and run versions. The configured confidence threshold classifies low-confidence candidates before review.
-* **Reusable Human Policy:** Active approvals are applied before the LLM phase; active rejections are detected before retrieval, so previously rejected terms do not call the model again. AE mapping uses controlled `AEDECOD` while retaining verbatim `AETERM` for traceability.
+* **Reusable Human Policy:** Active approvals are applied before the LLM phase; active rejections are detected before retrieval, so previously rejected terms do not call the model again. AE mapping uses controlled `AEDECOD` while retaining verbatim `AETERM`; CM mapping uses normalized `CMDECOD` while retaining verbatim `CMTRT`.
 * **Pinned OMOP Schema:** Installs all 39 tables from the OHDSI CDM v5.4.3 field specification. Populated tables use explicit DuckDB types, required fields, primary keys, staging tables, and relational acceptance checks.
 * **Explicit Trial Provenance:** Clinical SDTM records, including actual visits from SV, use the Standard `Case Report Form` Type Concept. Observation periods derived from the DM reference period use `Standard algorithm`; the source-to-type matrix is centralized and tested.
+* **Record-Level SDTM Lineage:** Every published person, observation period, visit, condition, drug, and measurement has exactly one validated row in `source_record_lineage`, preserving the SDTM domain, subject, sequence/key, source file, verbatim value, mapping value, and publication `run_id`. Drug rows additionally distinguish a source-recorded end from an administratively censored or convention-derived OMOP end date.
 * **Explicit Unit and Source Semantics:** CDISC units are mapped through a reviewed, case-sensitive dictionary to Standard `Unit` Concepts. A supplied but unknown unit is published as concept ID `0`, while a genuinely absent unit remains `NULL`; original values and source concept fields are retained explicitly.
 * **Clinical Time Rigor:** Derives unbiased `OBSERVATION_PERIOD` spans using strict CDISC Demographics reference dates (`RFSTDTC`/`RFENDTC`), preventing longitudinal biases from past medical history events.
 * **Software Engineering Best Practices:**
@@ -31,7 +32,7 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
 * `data/processed/`: Normalized OMOP CSV tables generated during transformation.
 * `resources/omop_cdm_v5_4/`: Pinned OHDSI v5.4.3 field specification, verified by SHA-256.
 * `src/omop/`: DDL generation and schema-contract validation for DuckDB.
-* `src/etl/`: Core transformation scripts (`person`, `condition`, `drug`, `measurement`, `observation_period`, `visit`, `link_visits`, `build_database`).
+* `src/etl/`: Core transformation scripts (`person`, `condition`, `drug`, `measurement`, `observation_period`, `visit`, `link_visits`, `source_lineage`, `build_database`).
 * `src/mapping/`: 
   * `deterministic_mapping.py`: OHDSI vocabulary exact matchers.
   * `llm_shared.py`: Parameterized SQL retrieval and mathematical confidence scoring.
@@ -45,9 +46,9 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
 ## 🛠️ Pipeline Execution Flow
 
 1. **Phase 1: Schema, Vocabularies & Audit Setup** — Installs the pinned 39-table OMOP CDM v5.4.3 contract, loads typed vocabularies, and builds audit metadata.
-2. **Phase 2: Structural ETL** — Transforms raw CDISC domains (DM, AE, MH, EX, CM, LB, VS, EG, SV, DS) into OMOP clinical tables. De-identified `STUDYID + SITEID` values become `CARE_SITE` source keys linked from `PERSON`; no site name, location, or facility type is invented. Observation periods come from DM, actual visits come from SV, and event links are added only when the visit is explicit or temporally unambiguous.
+2. **Phase 2: Structural ETL** — Transforms raw CDISC domains (DM, AE, MH, EX, CM, LB, VS, EG, SV, DS) into OMOP clinical tables. De-identified `STUDYID + SITEID` values become `CARE_SITE` source keys linked from `PERSON`; no site name, location, or facility type is invented. Observation periods come from DM, actual visits come from SV, and event links are added only when the visit is explicit or temporally unambiguous. A record-level SDTM lineage bridge is generated before mapping.
 3. **Phase 3: Semantic Mapping** — Applies deterministic mappings and previously approved human mappings. The LLM only proposes candidates for the remaining orphan terms; pending proposals stay as concept ID `0` in the published clinical tables.
-4. **Phase 4: Validated Publication** — Loads CSV outputs into temporary staging tables, casts them into the official contract, validates required fields, keys, dates, concepts and relations, then atomically publishes `cdisc_omop.duckdb`.
+4. **Phase 4: Validated Publication** — Loads CSV outputs into temporary staging tables, casts them into the official contract, validates required fields, keys, dates, concepts, relations, and complete lineage coverage, then atomically publishes `cdisc_omop.duckdb` together with `source_record_lineage`.
 
 ## ⚙️ How to Reproduce
 
@@ -133,10 +134,35 @@ extract. It can also be tested explicitly:
 ```
 
 **9. Run RWE Analytics:**
-Generate cohort demographics, adverse event frequencies, and rescue medication phenotyping.
+Generate cohort demographics, AE-domain adverse-event frequencies, domain-separated
+LB/VS/EG measurement summaries, and rescue-medication phenotyping. The analytics
+join `source_record_lineage`: Medical History is not counted as an adverse event,
+and repeated measurements are not labelled as baseline without an explicit baseline
+flag or derivation.
 ```bash
 python src/analytics/rwe_queries.py
 ```
+
+### Drug exposure end-date policy
+
+`drug_exposure_end_date` is required by OMOP CDM 5.4. The ETL applies a
+source-faithful hierarchy:
+
+1. An explicit `EXENDTC` or `CMENDTC` is published unchanged and copied to
+   `verbatim_end_date` (`SOURCE_RECORDED`).
+2. A CM record with no `CMENDTC` is accepted only when `CMENRTPT=ONGOING`. Its
+   required OMOP end date is censored at that subject's DM `RFENDTC`
+   (`ADMINISTRATIVE_CENSORING_RFENDTC`). This is an observation boundary, not an
+   asserted clinical stop date, so `verbatim_end_date` remains null.
+3. An EX administration without `EXENDTC` uses `EXSTDTC` as its end date
+   (`OHDSI_ADMINISTRATION_SAME_DAY`), following the OHDSI THEMIS convention for
+   administration records. `verbatim_end_date` remains null.
+4. A CM record missing both an end date and an explicit ongoing indicator blocks
+   the batch instead of silently inventing duration.
+
+The chosen values and derivation labels are retained in `source_record_lineage`
+as `source_end_date`, `published_end_date`, and `end_date_derivation`. No
+`days_supply`, prescription duration, or clinical discontinuation date is inferred.
 
 ## OMOP Schema Provenance
 

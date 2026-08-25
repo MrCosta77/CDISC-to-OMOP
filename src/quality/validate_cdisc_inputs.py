@@ -17,7 +17,7 @@ REQUIRED_COLUMNS = {
     "ae": {"USUBJID", "AESEQ", "AETERM", "AEDECOD", "AESEV", "AESER", "AESTDTC", "AEENDTC"},
     "mh": {"USUBJID", "MHSEQ", "MHTERM", "MHSTDTC"},
     "ex": {"USUBJID", "EXSEQ", "EXTRT", "EXSTDTC", "EXENDTC"},
-    "cm": {"USUBJID", "CMSEQ", "CMTRT", "CMSTDTC", "CMENDTC"},
+    "cm": {"USUBJID", "CMSEQ", "CMTRT", "CMDECOD", "CMSTDTC", "CMENDTC"},
     "lb": {"USUBJID", "LBSEQ", "VISITNUM", "LBTEST", "LBORRES", "LBORRESU", "LBDTC"},
     "vs": {"USUBJID", "VSSEQ", "VISITNUM", "VSTEST", "VSORRES", "VSORRESU", "VSDTC"},
     "eg": {"USUBJID", "EGSEQ", "VISITNUM", "EGTEST", "EGORRES", "EGORRESU", "EGDTC"},
@@ -121,6 +121,8 @@ def validate_frames(frames: dict[str, pd.DataFrame]) -> dict[str, int]:
     _require(set(frames["ds"]["USUBJID"]) == subject_ids, "DS must cover every DM subject")
     _require(set(frames["ae"]["AESEV"].dropna()) <= {"MILD", "MODERATE", "SEVERE"}, "AE.AESEV contains invalid controlled terminology")
     _require(set(frames["ae"]["AESER"].dropna()) <= {"Y", "N"}, "AE.AESER contains invalid controlled terminology")
+    cm_decoded = frames["cm"]["CMDECOD"].fillna("").astype(str).str.strip()
+    _require(cm_decoded.ne("").all(), "CM.CMDECOD is required for semantic mapping")
 
     for domain, start_field, end_field in (
         ("ae", "AESTDTC", "AEENDTC"),

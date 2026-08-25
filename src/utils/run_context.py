@@ -28,12 +28,14 @@ REQUIRED_RAW_DATASETS = (
     "dm", "ae", "mh", "ex", "cm", "lb", "vs", "eg", "sv", "ds"
 )
 CLINICAL_TABLES = (
+    "care_site",
     "person",
     "observation_period",
     "visit_occurrence",
     "condition_occurrence",
     "drug_exposure",
     "measurement",
+    "source_record_lineage",
 )
 
 

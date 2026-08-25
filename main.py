@@ -85,6 +85,10 @@ def main():
             ("src/etl/observation_period.py", "6. Calculate Observation Periods"),
             ("src/etl/visit.py", "7. Extract Actual Visits (SV)"),
             ("src/etl/link_visits.py", "8. Link Events to Visits"),
+            (
+                "src/etl/source_lineage.py",
+                "8b. Build SDTM-to-OMOP Source Lineage",
+            ),
             ("src/mapping/deterministic_mapping.py", "9. Deterministic Mapping"),
             (
                 "src/mapping/apply_approved_mappings.py",

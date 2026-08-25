@@ -140,7 +140,7 @@ def run_deterministic_mapping():
         if os.path.exists(drug_path):
             df_drug = pd.read_csv(drug_path)
             df_drug, mapped_d = process_domain(
-                df_drug, 'drug_source_value', 'drug_concept_id', 'drug_exposure_id',
+                df_drug, 'drug_mapping_value', 'drug_concept_id', 'drug_exposure_id',
                 'Drug', 'drug_exposure', con, run_id
             )
             if mapped_d > 0:

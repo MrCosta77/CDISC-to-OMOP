@@ -48,7 +48,13 @@ def run_etl_condition(ae_path, mh_path, output_path):
                 'condition_source_value': source_value,
                 'condition_verbatim_source_value': verbatim_value,
                 'condition_source_concept_id': 0,
-                'condition_status_source_value': row.get('AEOUT') # Specific AE outcome (e.g., RECOVERED)
+                # Specific AE outcome (e.g., RECOVERED)
+                'condition_status_source_value': row.get('AEOUT'),
+                'source_domain': 'AE',
+                'source_subject_id': row.get('USUBJID'),
+                'source_record_key': f"AESEQ={int(row.get('AESEQ'))}",
+                'source_record_value': verbatim_value,
+                'mapping_source_value': source_value,
             })
             condition_id_counter += 1
             
@@ -99,7 +105,12 @@ def run_etl_condition(ae_path, mh_path, output_path):
                 'condition_source_value': row.get('MHTERM'),
                 'condition_verbatim_source_value': row.get('MHTERM'),
                 'condition_source_concept_id': 0,
-                'condition_status_source_value': 'Medical History' # Traceability flag
+                'condition_status_source_value': 'Medical History',
+                'source_domain': 'MH',
+                'source_subject_id': row.get('USUBJID'),
+                'source_record_key': f"MHSEQ={int(row.get('MHSEQ'))}",
+                'source_record_value': row.get('MHTERM'),
+                'mapping_source_value': row.get('MHTERM'),
             })
             condition_id_counter += 1
 

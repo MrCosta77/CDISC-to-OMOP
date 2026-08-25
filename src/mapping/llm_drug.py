@@ -93,7 +93,7 @@ def run_llm_drug_mapping():
 
     # Identify orphans
     unmapped_mask = df_drug['drug_concept_id'] == 0
-    orphan_terms = df_drug[unmapped_mask]['drug_source_value'].dropna().unique()
+    orphan_terms = df_drug[unmapped_mask]['drug_mapping_value'].dropna().unique()
     
     if len(orphan_terms) == 0:
         print("✅ No unmapped drugs found! Everything is already standard.")
@@ -114,7 +114,7 @@ def run_llm_drug_mapping():
                 print("   ↪ Active approval already exists; LLM skipped.")
                 continue
             affected_ids = df_drug.loc[
-                unmapped_mask & (df_drug['drug_source_value'] == term),
+                unmapped_mask & (df_drug['drug_mapping_value'] == term),
                 'drug_exposure_id',
             ].tolist()
             if rule_status == "REJECTED":

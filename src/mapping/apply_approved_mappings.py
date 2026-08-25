@@ -24,7 +24,7 @@ MAPPING_TARGETS = {
     "drug_exposure": {
         "filename": "DRUG_EXPOSURE.csv",
         "id_column": "drug_exposure_id",
-        "source_column": "drug_source_value",
+        "source_column": "drug_mapping_value",
         "concept_column": "drug_concept_id",
         "domain": "Drug",
     },

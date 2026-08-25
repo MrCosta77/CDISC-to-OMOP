@@ -9,7 +9,8 @@ def test_condition_etl_recovers_legacy_mh_date(monkeypatch, tmp_path):
     legacy_mh = pd.DataFrame(
         [
             {
-                "USUBJID": "CDISC-01-701-002",
+                    "USUBJID": "CDISC-01-701-002",
+                    "MHSEQ": 1,
                 "MHTERM": "Hyperlipidemia",
                 "MHSTDTC": "21758",
             }
@@ -60,6 +61,7 @@ def test_condition_etl_rejects_unparseable_mh_date(monkeypatch, tmp_path):
 def test_ae_prefers_controlled_term_and_preserves_verbatim(monkeypatch, tmp_path):
     ae = pd.DataFrame([{
         "USUBJID": "CDISC-01-701-002",
+        "AESEQ": 1,
         "AESTDTC": "2023-01-10",
         "AEENDTC": "2023-01-11",
         "AETERM": "Application site erythema",

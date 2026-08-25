@@ -46,7 +46,11 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'measurement_source_concept_id': 0,
                 'measurement_source_domain': 'LB', # Custom traceability
                 'source_visit': row.get('VISIT'),
-                'source_visit_num': row.get('VISITNUM')
+                'source_visit_num': row.get('VISITNUM'),
+                'source_subject_id': row.get('USUBJID'),
+                'source_record_key': f"LBSEQ={int(row.get('LBSEQ'))}",
+                'source_record_value': row.get('LBTEST'),
+                'mapping_source_value': row.get('LBTEST'),
             })
             measurement_id_counter += 1
     except FileNotFoundError:
@@ -81,7 +85,11 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'measurement_source_concept_id': 0,
                 'measurement_source_domain': 'VS',
                 'source_visit': row.get('VISIT'),
-                'source_visit_num': row.get('VISITNUM')
+                'source_visit_num': row.get('VISITNUM'),
+                'source_subject_id': row.get('USUBJID'),
+                'source_record_key': f"VSSEQ={int(row.get('VSSEQ'))}",
+                'source_record_value': row.get('VSTEST'),
+                'mapping_source_value': row.get('VSTEST'),
             })
             measurement_id_counter += 1
     except FileNotFoundError:
@@ -138,7 +146,11 @@ def run_measurement_etl(lb_path, vs_path, eg_path, output_path):
                 'measurement_source_concept_id': 0,
                 'measurement_source_domain': 'EG',
                 'source_visit': row.get('VISIT'),
-                'source_visit_num': row.get('VISITNUM')
+                'source_visit_num': row.get('VISITNUM'),
+                'source_subject_id': row.get('USUBJID'),
+                'source_record_key': f"EGSEQ={int(row.get('EGSEQ'))}",
+                'source_record_value': row.get('EGTEST'),
+                'mapping_source_value': row.get('EGTEST'),
             })
             measurement_id_counter += 1
     except FileNotFoundError:
