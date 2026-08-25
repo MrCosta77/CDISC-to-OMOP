@@ -1,10 +1,12 @@
 """Link OMOP events to actual SV visits without inventing encounters."""
 
+import sys
 from pathlib import Path
 
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(PROJECT_ROOT))
 from src.utils.config import PROCESSED_DIR
 
 
