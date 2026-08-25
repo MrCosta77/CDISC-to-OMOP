@@ -85,9 +85,14 @@ Ensure your source `.sas7bdat` files and OHDSI vocabularies are inside the `data
 .\.venv\Scripts\python main.py
 ```
 Each execution receives a unique `run_id`. A successfully published run stores
-its status, input manifest, Git commit, configuration snapshot, output counts,
-and mapping provenance in DuckDB. Failed candidates are deliberately discarded
-so they cannot alter the published database; their step and error trail remains
+its status, input manifest, Git commit, Git dirty state, a SHA-256 manifest of
+the executable Python source tree, configuration snapshot, output counts, and
+mapping provenance in DuckDB. By default, publication is rejected when Git has
+uncommitted source changes, so the recorded commit identifies the executed
+code. For an explicit development-only run, set `ALLOW_DIRTY_RUN=true`; the run
+will remain visibly marked dirty and retain its source fingerprint. Failed
+candidates are deliberately discarded so they cannot alter the published
+database; their step and error trail remains
 available in `logs/pipeline.log`.
 
 The build temporarily requires enough free disk space for the published database

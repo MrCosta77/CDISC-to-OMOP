@@ -14,12 +14,26 @@ def resolve_project_path(value):
     path = Path(value)
     return str(path if path.is_absolute() else PROJECT_ROOT / path)
 
+
+def env_flag(name, default=False):
+    """Read a strict boolean environment flag."""
+    value = os.getenv(name)
+    if value is None:
+        return bool(default)
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean value.")
+
 # Fetch configurations from .env, with safe fallbacks
 DB_PATH = resolve_project_path(
     os.getenv("DB_PATH", str(PROJECT_ROOT / "data" / "cdisc_omop.duckdb"))
 )
 MODEL_NAME = os.getenv("MODEL_NAME", "qwen2.5-coder:7b")
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.90"))
+ALLOW_DIRTY_RUN = env_flag("ALLOW_DIRTY_RUN", False)
 VOCAB_DIR = resolve_project_path(
     os.getenv("VOCAB_DIR", str(PROJECT_ROOT / "data" / "omop_vocab"))
 )

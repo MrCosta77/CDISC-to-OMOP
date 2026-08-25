@@ -58,6 +58,16 @@ def _mock_orchestrator(monkeypatch, tmp_path, fail=False):
     _write_marker(final_path, "old")
     monkeypatch.setattr(orchestrator, "DB_PATH", str(final_path))
     monkeypatch.setattr(orchestrator, "generate_run_id", lambda: "RUN-ORCHESTRATOR")
+    monkeypatch.setattr(
+        orchestrator,
+        "collect_source_state",
+        lambda: {
+            "git_commit": "test",
+            "git_is_dirty": False,
+            "source_tree_sha256": "source",
+            "source_manifest": {"files": {}},
+        },
+    )
     monkeypatch.setattr(orchestrator, "validate_required_inputs", lambda: None)
     monkeypatch.setattr(
         orchestrator, "validate_cdisc_inputs", lambda: {"dm": 1}

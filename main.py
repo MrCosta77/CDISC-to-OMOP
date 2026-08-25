@@ -15,9 +15,11 @@ from src.utils.config import DB_PATH
 from src.utils.run_context import (
     RUN_ID_ENV,
     collect_output_counts,
+    collect_source_state,
     config_snapshot,
     finish_pipeline_run,
     generate_run_id,
+    require_publishable_source_state,
     start_pipeline_run,
     validate_required_inputs,
 )
@@ -60,6 +62,8 @@ def run_script(script_path, step_name, run_id):
 
 def main():
     run_id = generate_run_id()
+    source_state = collect_source_state()
+    require_publishable_source_state(source_state)
     os.environ[RUN_ID_ENV] = run_id
     logger.info("🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥🏥")
     logger.info("      CDISC TO OMOP - FULL ORCHESTRATOR")
@@ -118,6 +122,7 @@ def main():
                     run_id,
                     db_path=candidate_path,
                     snapshot=snapshot,
+                    source_state=source_state,
                 )
                 run_started = True
                 for script_path, step_name in steps:

@@ -9,6 +9,7 @@ from pathlib import Path
 import duckdb
 
 from src.utils.config import (
+    ALLOW_DIRTY_RUN,
     CONFIDENCE_THRESHOLD,
     DB_PATH,
     MODEL_NAME,
@@ -95,12 +96,28 @@ def ensure_audit_schema(con):
             started_at TIMESTAMP NOT NULL,
             finished_at TIMESTAMP,
             git_commit VARCHAR,
+            git_is_dirty BOOLEAN,
+            source_tree_sha256 VARCHAR,
+            source_manifest_json VARCHAR,
             input_manifest_json VARCHAR,
             config_snapshot_json VARCHAR,
             output_counts_json VARCHAR,
             error_message VARCHAR
         )
     """)
+    pipeline_columns = {
+        row[1]
+        for row in con.execute("PRAGMA table_info('pipeline_run')").fetchall()
+    }
+    for column, datatype in (
+        ("git_is_dirty", "BOOLEAN"),
+        ("source_tree_sha256", "VARCHAR"),
+        ("source_manifest_json", "VARCHAR"),
+    ):
+        if column not in pipeline_columns:
+            con.execute(
+                f'ALTER TABLE pipeline_run ADD COLUMN "{column}" {datatype}'
+            )
     con.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS ux_mapping_provenance_run_target
         ON mapping_provenance (run_id, target_table, target_id, mapping_method)
@@ -240,18 +257,77 @@ def build_input_manifest():
     }
 
 
-def get_git_commit():
+def get_git_state(project_root=PROJECT_ROOT):
+    """Return the current commit and whether tracked/untracked source changed."""
+    project_root = Path(project_root)
     try:
-        result = subprocess.run(
+        commit = subprocess.run(
             ["git", "rev-parse", "HEAD"],
-            cwd=PROJECT_ROOT,
+            cwd=project_root,
             check=True,
             capture_output=True,
             text=True,
-        )
-        return result.stdout.strip()
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+            cwd=project_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+        return {
+            "git_commit": commit,
+            "git_is_dirty": bool(status),
+            "git_status": status,
+        }
     except (OSError, subprocess.CalledProcessError):
-        return None
+        return {
+            "git_commit": None,
+            "git_is_dirty": None,
+            "git_status": [],
+        }
+
+
+def build_source_manifest(project_root=PROJECT_ROOT):
+    """Hash the Python source tree actually capable of driving the pipeline."""
+    project_root = Path(project_root)
+    paths = [project_root / "main.py"]
+    paths.extend(sorted((project_root / "src").rglob("*.py")))
+    files = {}
+    for path in paths:
+        if path.is_file():
+            relative = path.relative_to(project_root).as_posix()
+            files[relative] = _sha256(path)
+    canonical = json.dumps(files, sort_keys=True, separators=(",", ":"))
+    return {
+        "algorithm": "sha256",
+        "source_tree_sha256": hashlib.sha256(
+            canonical.encode("utf-8")
+        ).hexdigest(),
+        "files": files,
+    }
+
+
+def collect_source_state(project_root=PROJECT_ROOT):
+    state = get_git_state(project_root)
+    manifest = build_source_manifest(project_root)
+    state.update({
+        "source_tree_sha256": manifest["source_tree_sha256"],
+        "source_manifest": manifest,
+    })
+    return state
+
+
+def require_publishable_source_state(source_state, allow_dirty=ALLOW_DIRTY_RUN):
+    """Fail closed when Git can prove that unpublished source would be used."""
+    if source_state.get("git_is_dirty") and not allow_dirty:
+        examples = source_state.get("git_status", [])[:5]
+        detail = "; ".join(examples) if examples else "working tree modified"
+        raise RuntimeError(
+            "Refusing to publish from a dirty Git working tree. Commit or stash "
+            "the source changes first, or explicitly set ALLOW_DIRTY_RUN=true "
+            f"for a development run. Changes: {detail}"
+        )
 
 
 def config_snapshot():
@@ -262,6 +338,7 @@ def config_snapshot():
         "vocab_dir": VOCAB_DIR,
         "vocab_manifest_path": VOCAB_MANIFEST_PATH,
         "mapping_rules_path": MAPPING_RULES_PATH,
+        "allow_dirty_run": ALLOW_DIRTY_RUN,
     }
 
 
@@ -271,18 +348,27 @@ def start_pipeline_run(
     input_manifest=None,
     snapshot=None,
     git_commit=None,
+    source_state=None,
 ):
+    source_state = source_state or collect_source_state()
+    if git_commit is not None:
+        source_state = dict(source_state)
+        source_state["git_commit"] = git_commit
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     with duckdb.connect(str(db_path)) as con:
         ensure_audit_schema(con)
         con.execute("""
             INSERT INTO pipeline_run (
                 run_id, status, started_at, git_commit,
+                git_is_dirty, source_tree_sha256, source_manifest_json,
                 input_manifest_json, config_snapshot_json
-            ) VALUES (?, 'RUNNING', CURRENT_TIMESTAMP, ?, ?, ?)
+            ) VALUES (?, 'RUNNING', CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)
         """, (
             run_id,
-            get_git_commit() if git_commit is None else git_commit,
+            source_state.get("git_commit"),
+            source_state.get("git_is_dirty"),
+            source_state.get("source_tree_sha256"),
+            json.dumps(source_state.get("source_manifest"), sort_keys=True),
             json.dumps(
                 build_input_manifest() if input_manifest is None else input_manifest,
                 sort_keys=True,
