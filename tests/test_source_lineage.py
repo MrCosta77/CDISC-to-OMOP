@@ -37,7 +37,7 @@ def test_source_lineage_covers_each_published_clinical_row(tmp_path):
         drug_mapping_value="ACETAMINOPHEN",
         source_end_date=None,
         published_end_date="2023-01-31",
-        end_date_derivation="ADMINISTRATIVE_CENSORING_RFENDTC",
+        end_date_derivation="ADMINISTRATIVE_CENSORING_CMENTPT",
     )
     _write_source(
         tmp_path / "MEASUREMENT.csv",
@@ -67,4 +67,4 @@ def test_source_lineage_covers_each_published_clinical_row(tmp_path):
     assert drug["mapping_source_value"] == "ACETAMINOPHEN"
     assert drug["source_file"] == "cm.sas7bdat"
     assert drug["published_end_date"] == "2023-01-31"
-    assert drug["end_date_derivation"] == "ADMINISTRATIVE_CENSORING_RFENDTC"
+    assert drug["end_date_derivation"] == "ADMINISTRATIVE_CENSORING_CMENTPT"

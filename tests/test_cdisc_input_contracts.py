@@ -58,3 +58,25 @@ def test_event_outside_reference_period_is_rejected():
     frames["sv"].loc[0, "SVENDTC"] = "2024-12-31"
     with pytest.raises(ValueError, match="event before RFSTDTC"):
         validate_frames(frames)
+
+
+def test_ongoing_cm_requires_an_explicit_assessment_point():
+    frames = _frames()
+    frames["cm"].loc[0, "CMENTPT"] = ""
+    with pytest.raises(ValueError, match="CMENTPT must be present"):
+        validate_frames(frames)
+
+
+def test_cm_assessment_point_must_be_inside_dm_reference_period():
+    frames = _frames()
+    frames["cm"].loc[0, "CMENTPT"] = "2025-04-01"
+    with pytest.raises(ValueError, match="CMENTPT exceeds RFENDTC"):
+        validate_frames(frames)
+
+
+def test_nonongoing_cm_must_not_carry_a_reference_point():
+    frames = _frames()
+    frames["cm"].loc[0, "CMENDTC"] = "2025-02-01"
+    frames["cm"].loc[0, "CMENRTPT"] = ""
+    with pytest.raises(ValueError, match="CMENTPT must be present only"):
+        validate_frames(frames)

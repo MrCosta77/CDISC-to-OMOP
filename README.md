@@ -159,10 +159,12 @@ source-faithful hierarchy:
 
 1. An explicit `EXENDTC` or `CMENDTC` is published unchanged and copied to
    `verbatim_end_date` (`SOURCE_RECORDED`).
-2. A CM record with no `CMENDTC` is accepted only when `CMENRTPT=ONGOING`. Its
-   required OMOP end date is censored at that subject's DM `RFENDTC`
-   (`ADMINISTRATIVE_CENSORING_RFENDTC`). This is an observation boundary, not an
-   asserted clinical stop date, so `verbatim_end_date` remains null.
+2. A CM record with no `CMENDTC` is accepted only when `CMENRTPT=ONGOING` and
+   the source supplies its assessment point in `CMENTPT`. Its required OMOP end
+   date is censored at `CMENTPT` (`ADMINISTRATIVE_CENSORING_CMENTPT`). The point
+   must fall within the subject's DM reference period. This is a last-known
+   observation boundary, not an asserted clinical stop date, so
+   `verbatim_end_date` remains null.
 3. An EX administration without `EXENDTC` uses `EXSTDTC` as its end date
    (`OHDSI_ADMINISTRATION_SAME_DAY`), following the OHDSI THEMIS convention for
    administration records. `verbatim_end_date` remains null.

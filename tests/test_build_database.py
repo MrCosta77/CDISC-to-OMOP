@@ -111,7 +111,7 @@ def _write_valid_outputs(processed_dir):
             "source_subject_id": "SUBJ-1", "source_record_key": "CMSEQ=1",
             "source_value": "Paracetamol", "mapping_source_value": "ACETAMINOPHEN",
             "source_end_date": None, "published_end_date": "2023-01-31",
-            "end_date_derivation": "ADMINISTRATIVE_CENSORING_RFENDTC",
+            "end_date_derivation": "ADMINISTRATIVE_CENSORING_CMENTPT",
         },
         {
             "run_id": "RUN-TEST", "target_table": "measurement", "target_id": 40,
@@ -164,7 +164,7 @@ def test_database_build_publishes_all_tables(tmp_path):
         """).fetchone() == (
             None,
             pd.Timestamp("2023-01-31").date(),
-            "ADMINISTRATIVE_CENSORING_RFENDTC",
+            "ADMINISTRATIVE_CENSORING_CMENTPT",
         )
 
     with duckdb.connect(str(db_path)) as con:

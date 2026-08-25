@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from src.etl.drug import run_drug_etl
 
@@ -81,6 +82,7 @@ def test_ongoing_cm_is_administratively_censored_at_rfendtc(monkeypatch, tmp_pat
         "CMSTDTC": "2022-12-01",
         "CMENDTC": None,
         "CMENRTPT": "ONGOING",
+        "CMENTPT": "2023-03-15",
     }])
     dm = pd.DataFrame([{
         "USUBJID": "CDISC-01-701-002", "RFENDTC": "2023-04-04"
@@ -98,10 +100,10 @@ def test_ongoing_cm_is_administratively_censored_at_rfendtc(monkeypatch, tmp_pat
     run_drug_etl("ex.sas7bdat", "cm.sas7bdat", output_path)
 
     result = pd.read_csv(output_path)
-    assert result.loc[0, "drug_exposure_end_date"] == "2023-04-04"
+    assert result.loc[0, "drug_exposure_end_date"] == "2023-03-15"
     assert pd.isna(result.loc[0, "verbatim_end_date"])
     assert result.loc[0, "end_date_derivation"] == (
-        "ADMINISTRATIVE_CENSORING_RFENDTC"
+        "ADMINISTRATIVE_CENSORING_CMENTPT"
     )
 
 
@@ -123,6 +125,27 @@ def test_cm_without_end_or_ongoing_flag_is_rejected(monkeypatch, tmp_path):
         return conmed
 
     monkeypatch.setattr(pd, "read_sas", fake_read_sas)
-    import pytest
     with pytest.raises(ValueError, match="not explicitly ONGOING"):
+        run_drug_etl("ex.sas7bdat", "cm.sas7bdat", tmp_path / "out.csv")
+
+
+def test_ongoing_cm_without_cmentpt_is_rejected(monkeypatch, tmp_path):
+    conmed = pd.DataFrame([{
+        "USUBJID": "CDISC-01-701-002", "CMSEQ": 1, "CMTRT": "Metformin",
+        "CMDECOD": "METFORMIN", "CMSTDTC": "2022-12-01",
+        "CMENDTC": None, "CMENRTPT": "ONGOING", "CMENTPT": None,
+    }])
+    dm = pd.DataFrame([{
+        "USUBJID": "CDISC-01-701-002", "RFENDTC": "2023-04-04"
+    }])
+
+    def fake_read_sas(path, **_kwargs):
+        if str(path).endswith("ex.sas7bdat"):
+            return pd.DataFrame()
+        if str(path).endswith("dm.sas7bdat"):
+            return dm
+        return conmed
+
+    monkeypatch.setattr(pd, "read_sas", fake_read_sas)
+    with pytest.raises(ValueError, match="no valid CMENTPT"):
         run_drug_etl("ex.sas7bdat", "cm.sas7bdat", tmp_path / "out.csv")

@@ -17,7 +17,10 @@ REQUIRED_COLUMNS = {
     "ae": {"USUBJID", "AESEQ", "AETERM", "AEDECOD", "AESEV", "AESER", "AESTDTC", "AEENDTC"},
     "mh": {"USUBJID", "MHSEQ", "MHTERM", "MHSTDTC"},
     "ex": {"USUBJID", "EXSEQ", "EXTRT", "EXSTDTC", "EXENDTC"},
-    "cm": {"USUBJID", "CMSEQ", "CMTRT", "CMDECOD", "CMSTDTC", "CMENDTC"},
+    "cm": {
+        "USUBJID", "CMSEQ", "CMTRT", "CMDECOD", "CMSTDTC", "CMENDTC",
+        "CMENRTPT", "CMENTPT",
+    },
     "lb": {"USUBJID", "LBSEQ", "VISITNUM", "LBTEST", "LBORRES", "LBORRESU", "LBDTC"},
     "vs": {"USUBJID", "VSSEQ", "VISITNUM", "VSTEST", "VSORRES", "VSORRESU", "VSDTC"},
     "eg": {"USUBJID", "EGSEQ", "VISITNUM", "EGTEST", "EGORRES", "EGORRESU", "EGDTC"},
@@ -30,7 +33,7 @@ DATE_FIELDS = {
     "ae": ("AESTDTC", "AEENDTC"),
     "mh": ("MHSTDTC",),
     "ex": ("EXSTDTC", "EXENDTC"),
-    "cm": ("CMSTDTC", "CMENDTC"),
+    "cm": ("CMSTDTC", "CMENDTC", "CMENTPT"),
     "lb": ("LBDTC",),
     "vs": ("VSDTC",),
     "eg": ("EGDTC",),
@@ -123,6 +126,23 @@ def validate_frames(frames: dict[str, pd.DataFrame]) -> dict[str, int]:
     _require(set(frames["ae"]["AESER"].dropna()) <= {"Y", "N"}, "AE.AESER contains invalid controlled terminology")
     cm_decoded = frames["cm"]["CMDECOD"].fillna("").astype(str).str.strip()
     _require(cm_decoded.ne("").all(), "CM.CMDECOD is required for semantic mapping")
+    cm = frames["cm"]
+    cm_relative = cm["CMENRTPT"].fillna("").astype(str).str.strip().str.upper()
+    _require(
+        set(cm_relative) <= {"", "ONGOING"},
+        "CM.CMENRTPT contains invalid controlled terminology",
+    )
+    cm_end = parsed[("cm", "CMENDTC")]
+    cm_point = parsed[("cm", "CMENTPT")]
+    ongoing = cm_relative.eq("ONGOING")
+    _require(
+        (cm_end.isna() == ongoing).all(),
+        "CM end date and ONGOING indicator are inconsistent",
+    )
+    _require(
+        (cm_point.notna() == ongoing).all(),
+        "CM.CMENTPT must be present only for ONGOING records",
+    )
 
     for domain, start_field, end_field in (
         ("ae", "AESTDTC", "AEENDTC"),
@@ -136,6 +156,22 @@ def validate_frames(frames: dict[str, pd.DataFrame]) -> dict[str, int]:
         _require((ends[comparable] >= starts[comparable]).all(), f"{domain.upper()}: end date precedes start date")
 
     bounds = pd.DataFrame({"lower": dm_start.values, "upper": dm_end.values}, index=dm["USUBJID"])
+    cm_lower = cm["USUBJID"].map(bounds["lower"])
+    cm_upper = cm["USUBJID"].map(bounds["upper"])
+    _require(
+        (
+            cm_point[ongoing].reset_index(drop=True)
+            >= cm_lower[ongoing].reset_index(drop=True)
+        ).all(),
+        "CM.CMENTPT precedes RFSTDTC",
+    )
+    _require(
+        (
+            cm_point[ongoing].reset_index(drop=True)
+            <= cm_upper[ongoing].reset_index(drop=True)
+        ).all(),
+        "CM.CMENTPT exceeds RFENDTC",
+    )
     event_dates = {
         "ae": ("AESTDTC", "AEENDTC"),
         "ex": ("EXSTDTC", "EXENDTC"),

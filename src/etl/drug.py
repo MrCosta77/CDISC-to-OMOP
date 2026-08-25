@@ -126,12 +126,26 @@ def run_drug_etl(ex_path, cm_path, output_path, dm_path=None):
                 end_derivation = "SOURCE_RECORDED"
             elif ongoing:
                 subject = str(row.get("USUBJID"))
-                published_end_date = reference_ends.get(subject)
-                if pd.isna(published_end_date):
+                reference_end = reference_ends.get(subject)
+                censor_date = pd.to_datetime(
+                    row.get("CMENTPT"), errors="coerce"
+                )
+                if pd.isna(reference_end):
                     raise ValueError(
                         f"CM ongoing record has no DM RFENDTC boundary: {subject}."
                     )
-                end_derivation = "ADMINISTRATIVE_CENSORING_RFENDTC"
+                if pd.isna(censor_date):
+                    raise ValueError(
+                        f"CM ongoing record has no valid CMENTPT: {subject} "
+                        f"CMSEQ={row.get('CMSEQ')}."
+                    )
+                if censor_date < start_date or censor_date > reference_end:
+                    raise ValueError(
+                        f"CM CMENTPT is outside its valid exposure/reference "
+                        f"window: {subject} CMSEQ={row.get('CMSEQ')}."
+                    )
+                published_end_date = censor_date
+                end_derivation = "ADMINISTRATIVE_CENSORING_CMENTPT"
             else:
                 raise ValueError(
                     "CM record has no CMENDTC and is not explicitly ONGOING: "
