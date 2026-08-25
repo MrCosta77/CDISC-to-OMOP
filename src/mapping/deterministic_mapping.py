@@ -7,7 +7,7 @@ from pathlib import Path
 # Setup paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
-from src.utils.config import DB_PATH
+from src.utils.config import DB_PATH, PROCESSED_DIR
 from src.utils.run_context import require_run_id
 from src.mapping.review_store import get_vocabulary_version
 
@@ -119,9 +119,9 @@ def run_deterministic_mapping():
     print("-" * 50)
     
     run_id = require_run_id()
-    cond_path = os.path.join(PROJECT_ROOT, "data", "processed", "CONDITION_OCCURRENCE.csv")
-    drug_path = os.path.join(PROJECT_ROOT, "data", "processed", "DRUG_EXPOSURE.csv")
-    meas_path = os.path.join(PROJECT_ROOT, "data", "processed", "MEASUREMENT.csv") 
+    cond_path = os.path.join(PROCESSED_DIR, "CONDITION_OCCURRENCE.csv")
+    drug_path = os.path.join(PROCESSED_DIR, "DRUG_EXPOSURE.csv")
+    meas_path = os.path.join(PROCESSED_DIR, "MEASUREMENT.csv")
     
     with duckdb.connect(DB_PATH) as con:
         # 1. Conditions

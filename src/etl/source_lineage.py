@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
 from src.utils.run_context import require_run_id
+from src.utils.config import PROCESSED_DIR
 
 
 LINEAGE_INPUTS = {
@@ -48,7 +49,7 @@ LINEAGE_INPUTS = {
 
 
 def build_source_lineage(processed_dir=None, output_path=None, run_id=None):
-    processed_dir = Path(processed_dir or PROJECT_ROOT / "data" / "processed")
+    processed_dir = Path(processed_dir or PROCESSED_DIR)
     output_path = Path(
         output_path or processed_dir / "SOURCE_RECORD_LINEAGE.csv"
     )

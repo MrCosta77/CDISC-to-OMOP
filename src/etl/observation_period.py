@@ -7,15 +7,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 from src.utils.helpers import generate_person_id, parse_cdisc_date
 from src.omop.type_concepts import type_concept_id_for
+from src.utils.config import PROCESSED_DIR
 
 def run_observation_period_etl(dm_path=None, output_path=None):
     """Build one observation period per DM subject from RFSTDTC/RFENDTC."""
     print("⏳ Calculating OBSERVATION_PERIOD from the DM reference period...")
     dm_path = Path(dm_path or PROJECT_ROOT / "data" / "raw" / "dm.sas7bdat")
-    output_path = Path(
-        output_path
-        or PROJECT_ROOT / "data" / "processed" / "OBSERVATION_PERIOD.csv"
-    )
+    output_path = Path(output_path or Path(PROCESSED_DIR) / "OBSERVATION_PERIOD.csv")
     df_dm = pd.read_sas(dm_path, encoding="utf-8")
 
     required = {"USUBJID", "RFSTDTC", "RFENDTC"}

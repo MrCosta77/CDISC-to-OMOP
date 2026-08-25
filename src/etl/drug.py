@@ -6,6 +6,7 @@ import os
 # Add the src directory to the python path to import utils
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.utils.helpers import generate_person_id
+from src.utils.config import PROCESSED_DIR
 from src.omop.type_concepts import type_concept_id_for
 
 
@@ -209,6 +210,6 @@ def run_drug_etl(ex_path, cm_path, output_path, dm_path=None):
 if __name__ == "__main__":
     EX_FILE = "data/raw/ex.sas7bdat"
     CM_FILE = "data/raw/cm.sas7bdat"
-    OUTPUT_FILE = "data/processed/DRUG_EXPOSURE.csv"
+    OUTPUT_FILE = os.path.join(PROCESSED_DIR, "DRUG_EXPOSURE.csv")
     
     run_drug_etl(EX_FILE, CM_FILE, OUTPUT_FILE)

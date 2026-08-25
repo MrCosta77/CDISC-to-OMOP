@@ -5,6 +5,7 @@ import pandas as pd
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.utils.helpers import generate_care_site_id
+from src.utils.config import PROCESSED_DIR
 
 
 def run_etl_care_site(input_path, output_path):
@@ -35,4 +36,6 @@ def run_etl_care_site(input_path, output_path):
 
 
 if __name__ == "__main__":
-    run_etl_care_site("data/raw/dm.sas7bdat", "data/processed/CARE_SITE.csv")
+    run_etl_care_site(
+        "data/raw/dm.sas7bdat", os.path.join(PROCESSED_DIR, "CARE_SITE.csv")
+    )

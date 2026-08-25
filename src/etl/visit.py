@@ -6,15 +6,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 from src.omop.type_concepts import type_concept_id_for
 from src.utils.helpers import generate_person_id, parse_cdisc_date
+from src.utils.config import PROCESSED_DIR
 
 
 def run_visit_etl(sv_path=None, output_path=None):
     """Transform actual SDTM SV records into OMOP VISIT_OCCURRENCE."""
     print("🏥 Extracting OMOP VISIT_OCCURRENCE from SDTM SV...")
     sv_path = Path(sv_path or PROJECT_ROOT / "data" / "raw" / "sv.sas7bdat")
-    output_path = Path(
-        output_path or PROJECT_ROOT / "data" / "processed" / "VISIT_OCCURRENCE.csv"
-    )
+    output_path = Path(output_path or Path(PROCESSED_DIR) / "VISIT_OCCURRENCE.csv")
     df_visits = pd.read_sas(sv_path, encoding="utf-8")
     required = {"USUBJID", "VISITNUM", "VISIT", "SVSTDTC", "SVENDTC"}
     missing = sorted(required.difference(df_visits.columns))

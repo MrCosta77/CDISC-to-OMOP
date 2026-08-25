@@ -30,7 +30,7 @@ An end-to-end clinical data engineering pipeline with production-oriented contro
 ## 📂 Repository Structure
 
 * `data/raw/`: Input `.sas7bdat` clinical trial files (ignored by git).
-* `data/processed/`: Normalized OMOP CSV tables generated during transformation.
+* `data/processed/<run_id>/`: Normalized OMOP CSV tables isolated by execution.
 * `resources/omop_cdm_v5_4/`: Pinned OHDSI v5.4.3 field specification, verified by SHA-256.
 * `src/omop/`: DDL generation and schema-contract validation for DuckDB.
 * `src/etl/`: Core transformation scripts (`person`, `condition`, `drug`, `measurement`, `observation_period`, `visit`, `link_visits`, `source_lineage`, `build_database`).
@@ -62,7 +62,7 @@ cd CDISC-to-OMOP
 **2. Create an isolated environment and install dependencies (Windows PowerShell):**
 ```bash
 py -m venv .venv
-.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python -m pip install -r requirements-dev.txt
 ```
 
 **3. Configure the Environment:**
@@ -76,6 +76,10 @@ Ensure the mathematical core is intact before running the ETL.
 ```bash
 .\.venv\Scripts\python -m pytest -v
 ```
+
+`requirements.txt` contains the exact direct runtime versions used by the
+pipeline. `requirements-dev.txt` adds the equally pinned test and notebook
+tools used by CI and local development.
 
 **5. Place your raw data:**
 Ensure your source `.sas7bdat` files and OHDSI vocabularies are inside the `data/raw/` and `data/omop_vocab/` directories, respectively.
@@ -94,6 +98,17 @@ will remain visibly marked dirty and retain its source fingerprint. Failed
 candidates are deliberately discarded so they cannot alter the published
 database; their step and error trail remains
 available in `logs/pipeline.log`.
+
+The append-only `pipeline_run` ledger is carried from the previous published
+database into each new atomic candidate before the current run is added. This
+preserves execution history across successful rebuilds. Clinical tables,
+`source_record_lineage`, and event-level `mapping_provenance` intentionally
+describe only the currently published dataset and its `run_id`.
+
+Each full execution also receives its own `data/processed/<run_id>/` directory.
+No run can accidentally consume CSVs left by an earlier run. A failed run keeps
+its isolated directory for diagnosis, but that directory is never reused by a
+later execution.
 
 The build temporarily requires enough free disk space for the published database
 and one complete candidate. On Windows, close RStudio, database browsers, or

@@ -9,7 +9,7 @@ from pathlib import Path
 # Setup paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
-from src.utils.config import DB_PATH, MODEL_NAME, CONFIDENCE_THRESHOLD
+from src.utils.config import DB_PATH, MODEL_NAME, CONFIDENCE_THRESHOLD, PROCESSED_DIR
 from src.mapping.llm_shared import get_candidates_from_db_safe, calculate_confidence_score
 from src.mapping.review_store import (
     get_vocabulary_version,
@@ -84,7 +84,7 @@ def run_llm_measurement_mapping():
     print("-" * 70)
     
     run_id = require_run_id()
-    meas_path = os.path.join(PROJECT_ROOT, "data", "processed", "MEASUREMENT.csv")
+    meas_path = os.path.join(PROCESSED_DIR, "MEASUREMENT.csv")
     
     try:
         df_meas = pd.read_csv(meas_path)

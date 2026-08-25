@@ -9,7 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
 from src.mapping.review_store import normalize_source_value
-from src.utils.config import DB_PATH
+from src.utils.config import DB_PATH, PROCESSED_DIR
 from src.utils.run_context import ensure_audit_schema, require_run_id
 
 
@@ -137,7 +137,7 @@ def _apply_target(df, target_table, config, approvals, con, run_id):
 
 def apply_approved_mappings(db_path=DB_PATH, processed_dir=None, run_id=None):
     run_id = run_id or require_run_id()
-    processed_dir = Path(processed_dir or PROJECT_ROOT / "data" / "processed")
+    processed_dir = Path(processed_dir or PROCESSED_DIR)
     missing = [
         str(processed_dir / config["filename"])
         for config in MAPPING_TARGETS.values()

@@ -12,6 +12,7 @@ from src.utils.helpers import (
     generate_care_site_id,
     generate_person_id,
 )
+from src.utils.config import PROCESSED_DIR
 
 def run_etl_person(input_path, output_path):
     """
@@ -75,6 +76,6 @@ def run_etl_person(input_path, output_path):
 if __name__ == "__main__":
     # Define file paths relative to the project root
     INPUT_FILE = "data/raw/dm.sas7bdat"
-    OUTPUT_FILE = "data/processed/PERSON.csv"
+    OUTPUT_FILE = os.path.join(PROCESSED_DIR, "PERSON.csv")
     
     run_etl_person(INPUT_FILE, OUTPUT_FILE)

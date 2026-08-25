@@ -57,6 +57,7 @@ def _mock_orchestrator(monkeypatch, tmp_path, fail=False):
     final_path = tmp_path / "published.duckdb"
     _write_marker(final_path, "old")
     monkeypatch.setattr(orchestrator, "DB_PATH", str(final_path))
+    monkeypatch.setattr(orchestrator, "PROCESSED_DIR", str(tmp_path / "processed"))
     monkeypatch.setattr(orchestrator, "generate_run_id", lambda: "RUN-ORCHESTRATOR")
     monkeypatch.setattr(
         orchestrator,
@@ -73,6 +74,9 @@ def _mock_orchestrator(monkeypatch, tmp_path, fail=False):
         orchestrator, "validate_cdisc_inputs", lambda: {"dm": 1}
     )
     monkeypatch.setattr(orchestrator, "start_pipeline_run", lambda *a, **k: None)
+    monkeypatch.setattr(
+        orchestrator, "carry_forward_pipeline_history", lambda *a, **k: 1
+    )
     monkeypatch.setattr(orchestrator, "finish_pipeline_run", lambda *a, **k: None)
     monkeypatch.setattr(
         orchestrator, "validate_published_database", lambda *a, **k: None
@@ -81,40 +85,54 @@ def _mock_orchestrator(monkeypatch, tmp_path, fail=False):
         orchestrator, "collect_output_counts", lambda *a, **k: {"person": 1}
     )
     calls = []
+    processed_calls = []
 
     def fake_run_script(*_args):
         calls.append(os.environ["DB_PATH"])
+        processed_calls.append(os.environ["PROCESSED_DIR"])
         if len(calls) == 1:
             _write_marker(calls[0], "partial" if fail else "new")
         if fail and len(calls) == 2:
             raise RuntimeError("simulated step failure")
 
     monkeypatch.setattr(orchestrator, "run_script", fake_run_script)
-    return final_path, calls
+    return final_path, calls, processed_calls
 
 
 def test_orchestrator_publishes_candidate_after_all_steps(monkeypatch, tmp_path):
-    final_path, calls = _mock_orchestrator(monkeypatch, tmp_path)
+    final_path, calls, processed_calls = _mock_orchestrator(monkeypatch, tmp_path)
     previous = os.environ.get("DB_PATH")
+    previous_processed = os.environ.get("PROCESSED_DIR")
 
     orchestrator.main()
 
     assert calls
     assert all(path_value != str(final_path) for path_value in calls)
+    expected_processed = str(tmp_path / "processed" / "RUN-ORCHESTRATOR")
+    assert set(processed_calls) == {expected_processed}
+    assert (tmp_path / "processed" / "RUN-ORCHESTRATOR").is_dir()
     assert _read_marker(final_path) == "new"
     assert os.environ.get("DB_PATH") == previous
+    assert os.environ.get("PROCESSED_DIR") == previous_processed
 
 
 def test_orchestrator_failure_keeps_previous_database(monkeypatch, tmp_path):
-    final_path, calls = _mock_orchestrator(monkeypatch, tmp_path, fail=True)
+    final_path, calls, processed_calls = _mock_orchestrator(
+        monkeypatch, tmp_path, fail=True
+    )
     previous = os.environ.get("DB_PATH")
+    previous_processed = os.environ.get("PROCESSED_DIR")
 
     with pytest.raises(RuntimeError, match="simulated step failure"):
         orchestrator.main()
 
     assert calls
+    assert set(processed_calls) == {
+        str(tmp_path / "processed" / "RUN-ORCHESTRATOR")
+    }
     assert _read_marker(final_path) == "old"
     assert not candidate_database_path(
         final_path, "RUN-ORCHESTRATOR"
     ).exists()
     assert os.environ.get("DB_PATH") == previous
+    assert os.environ.get("PROCESSED_DIR") == previous_processed

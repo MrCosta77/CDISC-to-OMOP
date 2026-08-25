@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+from src.utils.config import PROCESSED_DIR
 
 
 def _link_domain(events, visits, event_date_column):
@@ -81,7 +81,7 @@ def _link_domain(events, visits, event_date_column):
 
 def run_visit_linking(processed_dir=None):
     print("🔗 Linking clinical events to actual SV visits...")
-    processed_dir = Path(processed_dir or PROJECT_ROOT / "data" / "processed")
+    processed_dir = Path(processed_dir or PROCESSED_DIR)
     visits = pd.read_csv(processed_dir / "VISIT_OCCURRENCE.csv")
     required = {
         "visit_occurrence_id", "person_id", "visit_start_date", "visit_end_date",

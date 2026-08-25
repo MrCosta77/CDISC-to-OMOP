@@ -6,6 +6,7 @@ import os
 # Add the src directory to the python path to import utils
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.utils.helpers import first_numeric_value, generate_person_id, parse_cdisc_date
+from src.utils.config import PROCESSED_DIR
 from src.omop.type_concepts import type_concept_id_for
 from src.omop.unit_concepts import unit_concept_id_for
 
@@ -185,6 +186,6 @@ if __name__ == "__main__":
     LB_FILE = "data/raw/lb.sas7bdat"
     VS_FILE = "data/raw/vs.sas7bdat"
     EG_FILE = "data/raw/eg.sas7bdat"
-    OUTPUT_FILE = "data/processed/MEASUREMENT.csv"
+    OUTPUT_FILE = os.path.join(PROCESSED_DIR, "MEASUREMENT.csv")
     
     run_measurement_etl(LB_FILE, VS_FILE, EG_FILE, OUTPUT_FILE)

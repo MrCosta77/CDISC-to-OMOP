@@ -11,9 +11,10 @@ sys.path.append(str(PROJECT_ROOT))
 # 1. IMPORT OUR PROFESSIONAL LOGGER
 from src.utils.logger import get_logger
 from src.utils.atomic_database import atomic_database_candidate
-from src.utils.config import DB_PATH
+from src.utils.config import DB_PATH, PROCESSED_DIR
 from src.utils.run_context import (
     RUN_ID_ENV,
+    carry_forward_pipeline_history,
     collect_output_counts,
     collect_source_state,
     config_snapshot,
@@ -72,10 +73,12 @@ def main():
 
     total_start = time.time()
     final_db_path = Path(DB_PATH).absolute()
+    processed_run_dir = Path(PROCESSED_DIR).absolute() / run_id
     try:
         validate_required_inputs()
         input_counts = validate_cdisc_inputs()
         logger.info(f"CDISC input contracts accepted: {input_counts}")
+        processed_run_dir.mkdir(parents=True, exist_ok=False)
 
         steps = [
             ("src/utils/setup_cdm_schema.py", "0. Install OMOP CDM 5.4 Schema"),
@@ -109,14 +112,21 @@ def main():
         ]
         with atomic_database_candidate(final_db_path, run_id) as candidate_path:
             previous_db_path = os.environ.get("DB_PATH")
+            previous_processed_dir = os.environ.get("PROCESSED_DIR")
             os.environ["DB_PATH"] = str(candidate_path)
+            os.environ["PROCESSED_DIR"] = str(processed_run_dir)
             run_started = False
             try:
+                history_count = carry_forward_pipeline_history(
+                    final_db_path, candidate_path
+                )
                 snapshot = config_snapshot()
                 snapshot.update({
                     "publication_mode": "atomic_candidate",
                     "publication_target": str(final_db_path),
                     "candidate_path": str(candidate_path),
+                    "processed_dir": str(processed_run_dir),
+                    "carried_pipeline_run_count": history_count,
                 })
                 start_pipeline_run(
                     run_id,
@@ -155,6 +165,10 @@ def main():
                     os.environ.pop("DB_PATH", None)
                 else:
                     os.environ["DB_PATH"] = previous_db_path
+                if previous_processed_dir is None:
+                    os.environ.pop("PROCESSED_DIR", None)
+                else:
+                    os.environ["PROCESSED_DIR"] = previous_processed_dir
 
         total_elapsed = time.time() - total_start
         logger.info(f"🎉 PIPELINE FULLY COMPLETED IN {total_elapsed:.1f}s! 🎉")

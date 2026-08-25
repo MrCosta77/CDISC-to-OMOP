@@ -5,6 +5,7 @@ import pytest
 
 from src.utils.run_context import (
     build_source_manifest,
+    carry_forward_pipeline_history,
     ensure_audit_schema,
     finish_pipeline_run,
     generate_run_id,
@@ -80,6 +81,35 @@ def test_dirty_source_is_rejected_unless_explicitly_allowed():
     with pytest.raises(RuntimeError, match="dirty Git working tree"):
         require_publishable_source_state(state, allow_dirty=False)
     require_publishable_source_state(state, allow_dirty=True)
+
+
+def test_pipeline_run_history_is_carried_forward_idempotently(tmp_path):
+    source = tmp_path / "published.duckdb"
+    target = tmp_path / "candidate.duckdb"
+    state = {
+        "git_commit": "abc123",
+        "git_is_dirty": False,
+        "source_tree_sha256": "tree123",
+        "source_manifest": {"files": {"main.py": "hash"}},
+    }
+    start_pipeline_run(
+        "RUN-OLD",
+        db_path=source,
+        input_manifest={},
+        snapshot={},
+        source_state=state,
+    )
+    finish_pipeline_run("RUN-OLD", "SUCCESS", db_path=source)
+
+    assert carry_forward_pipeline_history(source, target) == 1
+    assert carry_forward_pipeline_history(source, target) == 1
+    with duckdb.connect(str(target), read_only=True) as con:
+        rows = con.execute("""
+            SELECT run_id, status, git_commit, git_is_dirty,
+                   source_tree_sha256
+            FROM pipeline_run
+        """).fetchall()
+    assert rows == [("RUN-OLD", "SUCCESS", "abc123", False, "tree123")]
 
 
 def test_legacy_provenance_is_migrated_and_new_rows_are_idempotent(tmp_path):

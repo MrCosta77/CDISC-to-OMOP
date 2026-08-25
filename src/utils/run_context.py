@@ -15,6 +15,7 @@ from src.utils.config import (
     MODEL_NAME,
     MAPPING_RULES_PATH,
     PROJECT_ROOT,
+    PROCESSED_DIR,
     VOCAB_DIR,
     VOCAB_MANIFEST_PATH,
 )
@@ -37,6 +38,20 @@ CLINICAL_TABLES = (
     "drug_exposure",
     "measurement",
     "source_record_lineage",
+)
+PIPELINE_RUN_COLUMNS = (
+    "run_id",
+    "status",
+    "started_at",
+    "finished_at",
+    "git_commit",
+    "git_is_dirty",
+    "source_tree_sha256",
+    "source_manifest_json",
+    "input_manifest_json",
+    "config_snapshot_json",
+    "output_counts_json",
+    "error_message",
 )
 
 
@@ -335,6 +350,7 @@ def config_snapshot():
         "model_name": MODEL_NAME,
         "confidence_threshold": CONFIDENCE_THRESHOLD,
         "db_path": DB_PATH,
+        "processed_dir": PROCESSED_DIR,
         "vocab_dir": VOCAB_DIR,
         "vocab_manifest_path": VOCAB_MANIFEST_PATH,
         "mapping_rules_path": MAPPING_RULES_PATH,
@@ -375,6 +391,61 @@ def start_pipeline_run(
             ),
             json.dumps(config_snapshot() if snapshot is None else snapshot, sort_keys=True),
         ))
+
+
+def carry_forward_pipeline_history(source_db_path, target_db_path):
+    """Copy the append-only run ledger into a new atomic database candidate."""
+    source_db_path = Path(source_db_path)
+    target_db_path = Path(target_db_path)
+    if not source_db_path.is_file():
+        return 0
+
+    with duckdb.connect(str(source_db_path), read_only=True) as source:
+        exists = source.execute("""
+            SELECT COUNT(*)
+            FROM information_schema.tables
+            WHERE table_schema = 'main' AND table_name = 'pipeline_run'
+        """).fetchone()[0]
+        if not exists:
+            return 0
+        available = {
+            row[1]
+            for row in source.execute("PRAGMA table_info('pipeline_run')").fetchall()
+        }
+        if "run_id" not in available:
+            return 0
+        selected = [column for column in PIPELINE_RUN_COLUMNS if column in available]
+        order_by = (
+            '"started_at", "run_id"'
+            if "started_at" in available
+            else '"run_id"'
+        )
+        rows = source.execute(
+            "SELECT " + ", ".join(f'\"{column}\"' for column in selected)
+            + f" FROM pipeline_run ORDER BY {order_by}"
+        ).fetchall()
+
+    if not rows:
+        return 0
+    positions = {column: index for index, column in enumerate(selected)}
+    complete_rows = [
+        tuple(
+            row[positions[column]] if column in positions else None
+            for column in PIPELINE_RUN_COLUMNS
+        )
+        for row in rows
+    ]
+    target_db_path.parent.mkdir(parents=True, exist_ok=True)
+    with duckdb.connect(str(target_db_path)) as target:
+        ensure_audit_schema(target)
+        columns = ", ".join(f'\"{column}\"' for column in PIPELINE_RUN_COLUMNS)
+        placeholders = ", ".join("?" for _ in PIPELINE_RUN_COLUMNS)
+        target.executemany(
+            f"INSERT INTO pipeline_run ({columns}) VALUES ({placeholders}) "
+            "ON CONFLICT (run_id) DO NOTHING",
+            complete_rows,
+        )
+    return len(complete_rows)
 
 
 def collect_output_counts(db_path=DB_PATH):

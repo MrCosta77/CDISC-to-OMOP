@@ -9,7 +9,7 @@ from pathlib import Path
 # Setup paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
-from src.utils.config import DB_PATH, MODEL_NAME, CONFIDENCE_THRESHOLD
+from src.utils.config import DB_PATH, MODEL_NAME, CONFIDENCE_THRESHOLD, PROCESSED_DIR
 from src.mapping.llm_shared import get_candidates_from_db_safe, calculate_confidence_score
 from src.mapping.review_store import (
     get_vocabulary_version,
@@ -84,7 +84,7 @@ def run_llm_condition_mapping():
     print("-" * 70)
     
     run_id = require_run_id()
-    condition_path = os.path.join(PROJECT_ROOT, "data", "processed", "CONDITION_OCCURRENCE.csv")
+    condition_path = os.path.join(PROCESSED_DIR, "CONDITION_OCCURRENCE.csv")
     
     try:
         df_cond = pd.read_csv(condition_path)

@@ -5,7 +5,7 @@ from pathlib import Path
 # Setup paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
-from src.utils.config import DB_PATH
+from src.utils.config import DB_PATH, PROCESSED_DIR
 
 from src.omop.cdm54 import (
     CDM_RELEASE,
@@ -514,7 +514,7 @@ def build_omop_database(db_path=DB_PATH, processed_dir=None):
     print("🗄️ STARTING OMOP CDM 5.4 DATABASE PUBLICATION")
     print("-" * 70)
     print(f"Connecting to DuckDB at: {db_path}")
-    processed_dir = Path(processed_dir or PROJECT_ROOT / "data" / "processed")
+    processed_dir = Path(processed_dir or PROCESSED_DIR)
     paths = {
         table: processed_dir / filename
         for table, filename in PUBLICATION_FILES.items()
