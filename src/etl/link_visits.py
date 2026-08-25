@@ -18,12 +18,38 @@ def _link_domain(events, visits, event_date_column):
 
     if "source_visit_num" in result.columns:
         visit_numbers = pd.to_numeric(result["source_visit_num"], errors="coerce")
+        supplied = result["source_visit_num"].notna() & (
+            result["source_visit_num"].astype(str).str.strip() != ""
+        )
+        invalid = result.index[supplied & visit_numbers.isna()].tolist()
+        if invalid:
+            raise ValueError(
+                "Explicit visit reference contains a non-numeric VISITNUM at "
+                f"row(s): {invalid[:5]}."
+            )
+
+        unmatched = []
         for index in result.index[visit_numbers.notna()]:
             person_id = result.at[index, "person_id"]
-            if pd.notna(person_id):
-                result.at[index, "visit_occurrence_id"] = visit_lookup.get(
-                    (int(person_id), float(visit_numbers.at[index])), pd.NA
+            key = (
+                (int(person_id), float(visit_numbers.at[index]))
+                if pd.notna(person_id) else None
+            )
+            visit_id = visit_lookup.get(key) if key is not None else None
+            if visit_id is None:
+                unmatched.append(
+                    (index, person_id, float(visit_numbers.at[index]))
                 )
+            else:
+                result.at[index, "visit_occurrence_id"] = visit_id
+        if unmatched:
+            examples = ", ".join(
+                f"row={index}, person_id={person_id}, VISITNUM={visit_num:g}"
+                for index, person_id, visit_num in unmatched[:5]
+            )
+            raise ValueError(
+                "Explicit visit reference has no matching SV visit: " + examples
+            )
 
     event_dates = pd.to_datetime(result[event_date_column], errors="coerce")
     visit_starts = pd.to_datetime(visits["visit_start_date"], errors="raise")

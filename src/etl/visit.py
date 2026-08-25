@@ -41,7 +41,10 @@ def run_visit_etl(sv_path=None, output_path=None):
 
     df_visits = df_visits.sort_values(["person_id", "start_date", "source_visit_num"]).reset_index(drop=True)
     df_visits['visit_occurrence_id'] = range(1, len(df_visits) + 1)
-    df_visits['visit_concept_id'] = 9202
+    # SDTM SV identifies an actual protocol visit, but it does not establish
+    # the OMOP visit setting (for example, outpatient or inpatient). Publish
+    # the required unknown Concept instead of inventing that classification.
+    df_visits['visit_concept_id'] = 0
     df_visits['visit_start_date'] = df_visits['start_date'].dt.strftime('%Y-%m-%d')
     df_visits['visit_end_date'] = df_visits['end_date'].dt.strftime('%Y-%m-%d')
     df_visits['visit_type_concept_id'] = type_concept_id_for('visit_occurrence', 'SV')
@@ -49,7 +52,7 @@ def run_visit_etl(sv_path=None, output_path=None):
     df_visits['source_domain'] = 'SV'
     df_visits['source_subject_id'] = df_visits['USUBJID']
     df_visits['source_record_key'] = df_visits['source_visit_num'].map(
-        lambda value: f"VISITNUM={int(value)}"
+        lambda value: f"VISITNUM={format(float(value), 'g')}"
     )
     df_visits['source_record_value'] = df_visits['visit_source_value']
     df_visits['mapping_source_value'] = None

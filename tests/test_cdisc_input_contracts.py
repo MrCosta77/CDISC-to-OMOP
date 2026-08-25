@@ -80,3 +80,11 @@ def test_nonongoing_cm_must_not_carry_a_reference_point():
     frames["cm"].loc[0, "CMENRTPT"] = ""
     with pytest.raises(ValueError, match="CMENTPT must be present only"):
         validate_frames(frames)
+
+
+@pytest.mark.parametrize("domain", ["lb", "vs", "eg"])
+def test_measurement_visit_number_must_exist_in_sv(domain):
+    frames = _frames()
+    frames[domain].loc[0, "VISITNUM"] = 99
+    with pytest.raises(ValueError, match="VISITNUM reference.*absent from SV"):
+        validate_frames(frames)

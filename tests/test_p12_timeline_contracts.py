@@ -48,6 +48,7 @@ def test_visit_etl_uses_actual_sv_and_crf_provenance(monkeypatch, tmp_path):
     result = pd.read_csv(output)
     assert result["source_visit_num"].tolist() == [1, 2]
     assert result["visit_source_value"].tolist() == ["Visit 1", "Visit 2"]
+    assert set(result["visit_concept_id"]) == {0}
     assert set(result["visit_type_concept_id"]) == {32809}
 
 
@@ -94,4 +95,27 @@ def test_visit_linking_rejects_ambiguous_date_match(tmp_path):
         pd.DataFrame(columns=["person_id", "measurement_date"]),
     )
     with pytest.raises(ValueError, match="Ambiguous visit link"):
+        run_visit_linking(tmp_path)
+
+
+def test_visit_linking_rejects_unknown_explicit_visit_number(tmp_path):
+    person_id = generate_person_id(USUBJID)
+    _write_link_inputs(
+        tmp_path,
+        pd.DataFrame([{
+            "visit_occurrence_id": 10,
+            "person_id": person_id,
+            "visit_start_date": "2023-01-10",
+            "visit_end_date": "2023-01-10",
+            "source_visit_num": 1,
+        }]),
+        pd.DataFrame([{"person_id": person_id, "condition_start_date": "2020-01-01"}]),
+        pd.DataFrame([{"person_id": person_id, "drug_exposure_start_date": "2023-01-11"}]),
+        pd.DataFrame([{
+            "person_id": person_id,
+            "measurement_date": "2023-01-11",
+            "source_visit_num": 99,
+        }]),
+    )
+    with pytest.raises(ValueError, match="no matching SV visit"):
         run_visit_linking(tmp_path)

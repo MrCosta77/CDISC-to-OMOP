@@ -215,12 +215,19 @@ of the event. The current synthetic study uses this explicit matrix:
 | `CONDITION_OCCURRENCE` | AE, MH | `32809` — Case Report Form | Direct eCRF/SDTM clinical records |
 | `DRUG_EXPOSURE` | EX, CM | `32809` — Case Report Form | Direct eCRF/SDTM medication records |
 | `MEASUREMENT` | LB, VS, EG | `32809` — Case Report Form | Current synthetic eCRF/SDTM measurement feed |
-| `VISIT_OCCURRENCE` | Derived event dates | `32880` — Standard algorithm | Constructed deterministically by the ETL |
-| `OBSERVATION_PERIOD` | DM dates or active-event fallback | `32880` — Standard algorithm | Constructed deterministically by the ETL |
+| `VISIT_OCCURRENCE` | SV | `32809` — Case Report Form | Actual visits reported in SDTM SV |
+| `OBSERVATION_PERIOD` | Derived from DM reference dates | `32880` — Standard algorithm | Constructed deterministically from RFSTDTC/RFENDTC |
 
 The assignments live in `src/omop/type_concepts.py`. A future direct central-
 laboratory feed must receive an explicit assignment (for example, `32856` —
 Lab) rather than silently inheriting the current LB assumption.
+
+SDTM SV does not identify an inpatient, outpatient, emergency or other OMOP
+visit setting in this source. Therefore `visit_concept_id` is published as `0`
+(`No matching concept`) while `visit_source_value`, the actual SV dates and the
+Case Report Form Type Concept preserve what the source does support. Every
+explicit LB/VS/EG `(USUBJID, VISITNUM)` must match an SV record; an unknown
+reference blocks the batch rather than silently dropping the visit link.
 
 ## Unit and Source Concept Contract
 

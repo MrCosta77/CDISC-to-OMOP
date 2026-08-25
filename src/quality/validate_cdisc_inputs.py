@@ -120,6 +120,30 @@ def validate_frames(frames: dict[str, pd.DataFrame]) -> dict[str, int]:
             _require(duplicates == 0, f"{domain.upper()}: duplicate USUBJID/{seq}")
 
     _require(not frames["sv"].duplicated(["USUBJID", "VISITNUM"]).any(), "SV USUBJID/VISITNUM must be unique")
+
+    visit_numbers = {}
+    for domain in ("sv", "lb", "vs", "eg"):
+        numbers = pd.to_numeric(frames[domain]["VISITNUM"], errors="coerce")
+        _require(
+            numbers.notna().all(),
+            f"{domain.upper()}.VISITNUM contains missing or non-numeric values",
+        )
+        visit_numbers[domain] = numbers
+
+    sv_visit_keys = set(
+        zip(frames["sv"]["USUBJID"], visit_numbers["sv"].astype(float))
+    )
+    for domain in ("lb", "vs", "eg"):
+        domain_keys = set(
+            zip(frames[domain]["USUBJID"], visit_numbers[domain].astype(float))
+        )
+        unknown_visits = sorted(domain_keys - sv_visit_keys)
+        _require(
+            not unknown_visits,
+            f"{domain.upper()}: VISITNUM reference(s) absent from SV: "
+            f"{unknown_visits[:5]}",
+        )
+
     _require(frames["ds"].groupby("USUBJID").size().eq(1).all(), "DS must contain exactly one final record per subject")
     _require(set(frames["ds"]["USUBJID"]) == subject_ids, "DS must cover every DM subject")
     _require(set(frames["ae"]["AESEV"].dropna()) <= {"MILD", "MODERATE", "SEVERE"}, "AE.AESEV contains invalid controlled terminology")
