@@ -49,10 +49,27 @@ RACE_TERMS = {
     "UNKNOWN",
 }
 
+NONBLANK_FIELDS = {
+    "dm": ("STUDYID", "USUBJID", "SUBJID", "SITEID"),
+    "ae": ("USUBJID", "AETERM"),
+    "mh": ("USUBJID", "MHTERM"),
+    "ex": ("USUBJID", "EXTRT"),
+    "cm": ("USUBJID", "CMTRT", "CMDECOD"),
+    "lb": ("USUBJID", "LBTEST", "LBORRES"),
+    "vs": ("USUBJID", "VSTEST", "VSORRES"),
+    "eg": ("USUBJID", "EGTEST", "EGORRES"),
+    "sv": ("USUBJID", "VISIT"),
+    "ds": ("USUBJID", "DSTERM", "DSDECOD"),
+}
+
 
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)
+
+
+def _nonblank(values: pd.Series) -> pd.Series:
+    return values.fillna("").astype(str).str.strip().ne("")
 
 
 def _parse_dates(frame: pd.DataFrame, domain: str, field: str) -> pd.Series:
@@ -84,7 +101,11 @@ def validate_frames(frames: dict[str, pd.DataFrame]) -> dict[str, int]:
         missing = sorted(required - set(frame.columns))
         _require(not missing, f"{domain.upper()}: missing required column(s): {missing}")
         _require(not frame.empty, f"{domain.upper()}: dataset is empty")
-        _require(frame["USUBJID"].notna().all(), f"{domain.upper()}.USUBJID: missing key")
+        for field in NONBLANK_FIELDS[domain]:
+            _require(
+                _nonblank(frame[field]).all(),
+                f"{domain.upper()}.{field}: blank or missing required value",
+            )
         for field in DATE_FIELDS[domain]:
             parsed[(domain, field)] = _parse_dates(frame, domain.upper(), field)
 
@@ -116,6 +137,11 @@ def validate_frames(frames: dict[str, pd.DataFrame]) -> dict[str, int]:
         _require(not unknown, f"{domain.upper()}: unknown USUBJID value(s): {unknown[:5]}")
         seq = f"{domain.upper()}SEQ"
         if seq in frame.columns:
+            numeric_seq = pd.to_numeric(frame[seq], errors="coerce")
+            _require(
+                numeric_seq.notna().all(),
+                f"{domain.upper()}.{seq}: missing or non-numeric sequence key",
+            )
             duplicates = frame.duplicated(["USUBJID", seq], keep=False).sum()
             _require(duplicates == 0, f"{domain.upper()}: duplicate USUBJID/{seq}")
 

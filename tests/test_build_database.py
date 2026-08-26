@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from src.etl.build_database import (
+    _validate_mapping_provenance,
     build_omop_database,
     validate_published_database,
 )
@@ -18,6 +19,66 @@ PROCESSED_FILES = (
     "MEASUREMENT.csv",
     "OBSERVATION_PERIOD.csv",
 )
+
+
+def _provenance_candidates(con):
+    con.execute("""
+        CREATE TABLE candidate_condition (
+            condition_occurrence_id BIGINT,
+            condition_concept_id BIGINT
+        )
+    """)
+    con.execute("INSERT INTO candidate_condition VALUES (1, 123)")
+    con.execute("""
+        CREATE TABLE candidate_drug (
+            drug_exposure_id BIGINT,
+            drug_concept_id BIGINT
+        )
+    """)
+    con.execute("INSERT INTO candidate_drug VALUES (2, 0)")
+    con.execute("""
+        CREATE TABLE candidate_measurement (
+            measurement_id BIGINT,
+            measurement_concept_id BIGINT
+        )
+    """)
+    con.execute("INSERT INTO candidate_measurement VALUES (3, 0)")
+    return {
+        "condition_occurrence": "candidate_condition",
+        "drug_exposure": "candidate_drug",
+        "measurement": "candidate_measurement",
+    }
+
+
+def test_mapped_concept_requires_matching_provenance():
+    with duckdb.connect(":memory:") as con:
+        candidates = _provenance_candidates(con)
+        with pytest.raises(ValueError, match="without mapping_provenance"):
+            _validate_mapping_provenance(con, candidates, "RUN-TEST")
+
+
+def test_mapping_provenance_must_match_run_target_and_concept():
+    with duckdb.connect(":memory:") as con:
+        candidates = _provenance_candidates(con)
+        con.execute("""
+            CREATE TABLE mapping_provenance (
+                provenance_id BIGINT,
+                target_table VARCHAR,
+                target_id BIGINT,
+                assigned_concept_id BIGINT,
+                run_id VARCHAR
+            )
+        """)
+        con.execute("""
+            INSERT INTO mapping_provenance VALUES (
+                1, 'condition_occurrence', 1, 123, 'RUN-TEST'
+            )
+        """)
+        _validate_mapping_provenance(con, candidates, "RUN-TEST")
+
+        con.execute("UPDATE mapping_provenance SET assigned_concept_id = 999")
+        with pytest.raises(ValueError, match="coverage failed"):
+            _validate_mapping_provenance(con, candidates, "RUN-TEST")
 
 
 def _write_valid_outputs(processed_dir):

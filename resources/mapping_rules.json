@@ -28,6 +28,15 @@
       "target_table": "drug_exposure"
     },
     {
+      "concept_id": 3012888,
+      "normalized_value": "diastolic blood pressure",
+      "review_reason": "Numeric diastolic blood pressure measurement; LOINC 8462-4 selected over the generic SNOMED observable entity.",
+      "reviewed_at": "2026-08-26T01:06:13.421807",
+      "reviewed_by": "Mario Costa",
+      "source_value": "Diastolic Blood Pressure",
+      "target_table": "measurement"
+    },
+    {
       "concept_id": 3025809,
       "normalized_value": "qt duration",
       "review_reason": "CDISC QT Interval Aggregate maps to LOINC Q-T interval; ST segment duration is incorrect.",
@@ -43,6 +52,15 @@
       "reviewed_at": "2026-08-20T23:58:22.022480",
       "reviewed_by": "Mario Costa",
       "source_value": "RR Duration",
+      "target_table": "measurement"
+    },
+    {
+      "concept_id": 3004249,
+      "normalized_value": "systolic blood pressure",
+      "review_reason": "Numeric systolic blood pressure measurement; LOINC 8480-6 selected over the generic SNOMED observable entity.",
+      "reviewed_at": "2026-08-26T01:06:14.705186",
+      "reviewed_by": "Mario Costa",
+      "source_value": "Systolic Blood Pressure",
       "target_table": "measurement"
     },
     {
@@ -81,7 +99,7 @@
       "target_table": "drug_exposure"
     }
   ],
-  "ruleset_fingerprint": "7c2cb3df202326939443353df8e46a5269edd8f7e5f558572407e601d2868f8e",
+  "ruleset_fingerprint": "b44f3270e65a7a3baddb2dea74098946caea196ec752a567df3846e9aa29a9e8",
   "schema_version": 1,
   "vocabulary_fingerprint": "91d706accf323fcdcb0eb6dd6aafb0246ae90143c87641fca6d1d5794a10fa9b",
   "vocabulary_version": "Athena-91d706accf32"

@@ -2,7 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from src.quality.validate_cdisc_inputs import load_golden_fixture, validate_frames
+from src.quality.validate_cdisc_inputs import (
+    NONBLANK_FIELDS,
+    load_golden_fixture,
+    validate_frames,
+)
 
 
 GOLDEN = Path(__file__).parent / "fixtures" / "golden_cdisc.json"
@@ -41,7 +45,33 @@ def test_site_must_be_present_and_match_subjid():
 def test_blank_site_is_rejected():
     frames = _frames()
     frames["dm"].loc[0, "SITEID"] = ""
-    with pytest.raises(ValueError, match="SITEID is required"):
+    with pytest.raises(ValueError, match="DM.SITEID: blank or missing"):
+        validate_frames(frames)
+
+
+@pytest.mark.parametrize(
+    ("domain", "field"),
+    [
+        (domain, field)
+        for domain, fields in NONBLANK_FIELDS.items()
+        for field in fields
+    ],
+)
+def test_semantically_required_values_reject_blank_text(domain, field):
+    frames = _frames()
+    frames[domain].loc[0, field] = "   "
+    with pytest.raises(
+        ValueError,
+        match=rf"{domain.upper()}\.{field}: blank or missing",
+    ):
+        validate_frames(frames)
+
+
+def test_sequence_key_must_be_numeric_and_present():
+    frames = _frames()
+    frames["ae"]["AESEQ"] = frames["ae"]["AESEQ"].astype("object")
+    frames["ae"].loc[0, "AESEQ"] = "not-a-sequence"
+    with pytest.raises(ValueError, match="AE.AESEQ: missing or non-numeric"):
         validate_frames(frames)
 
 

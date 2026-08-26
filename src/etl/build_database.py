@@ -20,6 +20,7 @@ from src.omop.cdm54 import (
     validate_table_schema,
 )
 from src.omop.type_concepts import TYPE_CONCEPT_FIELDS
+from src.utils.run_context import require_run_id
 
 
 PUBLICATION_FILES = {
@@ -68,6 +69,12 @@ SOURCE_SEMANTIC_FIELDS = {
         "unit_source_value",
         "value_source_value",
     },
+}
+
+SEMANTIC_CONCEPT_FIELDS = {
+    "condition_occurrence": ("condition_occurrence_id", "condition_concept_id"),
+    "drug_exposure": ("drug_exposure_id", "drug_concept_id"),
+    "measurement": ("measurement_id", "measurement_concept_id"),
 }
 
 
@@ -376,6 +383,84 @@ def _validate_concepts(con, candidates):
             )
 
 
+def _validate_mapping_provenance(con, candidates, expected_run_id):
+    """Require one matching audit row for every published semantic mapping."""
+    if not str(expected_run_id or "").strip():
+        raise ValueError("Mapping provenance validation requires a run_id.")
+
+    mapped_count = sum(
+        con.execute(f"""
+            SELECT COUNT(*) FROM {quote_identifier(candidates[table])}
+            WHERE {quote_identifier(concept_column)} <> 0
+        """).fetchone()[0]
+        for table, (_, concept_column) in SEMANTIC_CONCEPT_FIELDS.items()
+    )
+    provenance_exists = con.execute("""
+        SELECT COUNT(*)
+        FROM information_schema.tables
+        WHERE table_schema = 'main' AND table_name = 'mapping_provenance'
+    """).fetchone()[0]
+    if not provenance_exists:
+        if mapped_count:
+            raise ValueError(
+                "Mapped clinical concepts exist without mapping_provenance."
+            )
+        return
+
+    target_placeholders = ", ".join(
+        "?" for _ in SEMANTIC_CONCEPT_FIELDS
+    )
+    foreign_runs = con.execute(f"""
+        SELECT COUNT(*) FROM mapping_provenance
+        WHERE target_table IN ({target_placeholders})
+          AND (run_id IS NULL OR run_id <> ?)
+    """, [*SEMANTIC_CONCEPT_FIELDS, expected_run_id]).fetchone()[0]
+    if foreign_runs:
+        raise ValueError(
+            f"Mapping provenance contains {foreign_runs} row(s) outside "
+            f"publication run {expected_run_id}."
+        )
+
+    for table, (id_column, concept_column) in SEMANTIC_CONCEPT_FIELDS.items():
+        physical = candidates[table]
+        missing_or_duplicate = con.execute(f"""
+            SELECT COUNT(*)
+            FROM {quote_identifier(physical)} t
+            WHERE t.{quote_identifier(concept_column)} <> 0
+              AND (
+                  SELECT COUNT(*) FROM mapping_provenance p
+                  WHERE p.run_id = ?
+                    AND p.target_table = ?
+                    AND p.target_id = t.{quote_identifier(id_column)}
+                    AND p.assigned_concept_id = t.{quote_identifier(concept_column)}
+              ) <> 1
+        """, [expected_run_id, table]).fetchone()[0]
+        if missing_or_duplicate:
+            raise ValueError(
+                f"Mapping provenance coverage failed for {table}: "
+                f"{missing_or_duplicate} mapped row(s) lack exactly one "
+                "matching audit record."
+            )
+
+        orphan_or_mismatch = con.execute(f"""
+            SELECT COUNT(*)
+            FROM mapping_provenance p
+            LEFT JOIN {quote_identifier(physical)} t
+              ON p.target_id = t.{quote_identifier(id_column)}
+            WHERE p.run_id = ? AND p.target_table = ?
+              AND (
+                  t.{quote_identifier(id_column)} IS NULL
+                  OR t.{quote_identifier(concept_column)} = 0
+                  OR p.assigned_concept_id <> t.{quote_identifier(concept_column)}
+              )
+        """, [expected_run_id, table]).fetchone()[0]
+        if orphan_or_mismatch:
+            raise ValueError(
+                f"Mapping provenance integrity failed for {table}: "
+                f"{orphan_or_mismatch} orphan or mismatched audit row(s)."
+            )
+
+
 def _validate_candidates(con, candidates):
     care_site = candidates["care_site"]
     person = candidates["person"]
@@ -463,11 +548,12 @@ def _validate_lineage(con, lineage, candidates):
     if unexpected:
         raise ValueError(f"Unsupported lineage targets: {unexpected}")
 
-    run_count = con.execute(f"""
-        SELECT COUNT(DISTINCT run_id) FROM {quote_identifier(lineage)}
-    """).fetchone()[0]
-    if run_count != 1:
+    run_ids = con.execute(f"""
+        SELECT DISTINCT run_id FROM {quote_identifier(lineage)}
+    """).fetchall()
+    if len(run_ids) != 1:
         raise ValueError("Lineage must contain exactly one publication run_id.")
+    lineage_run_id = run_ids[0][0]
 
     for target_table, id_column in LINEAGE_TARGETS.items():
         physical = candidates[target_table]
@@ -509,8 +595,9 @@ def _validate_lineage(con, lineage, candidates):
         raise ValueError(
             f"Lineage contains {file_mismatches} inconsistent source filenames."
         )
+    return lineage_run_id
 
-def build_omop_database(db_path=DB_PATH, processed_dir=None):
+def build_omop_database(db_path=DB_PATH, processed_dir=None, run_id=None):
     print("🗄️ STARTING OMOP CDM 5.4 DATABASE PUBLICATION")
     print("-" * 70)
     print(f"Connecting to DuckDB at: {db_path}")
@@ -549,7 +636,17 @@ def build_omop_database(db_path=DB_PATH, processed_dir=None):
             )
 
             _validate_candidates(con, candidates)
-            _validate_lineage(con, lineage_candidate, candidates)
+            lineage_run_id = _validate_lineage(
+                con, lineage_candidate, candidates
+            )
+            expected_run_id = run_id or lineage_run_id
+            if lineage_run_id != expected_run_id:
+                raise ValueError(
+                    "Lineage run_id does not match the publication run_id."
+                )
+            _validate_mapping_provenance(
+                con, candidates, expected_run_id
+            )
 
             con.execute("DROP TABLE IF EXISTS source_record_lineage")
             for table in reversed(PUBLICATION_FILES):
@@ -593,7 +690,10 @@ def validate_published_database(db_path=DB_PATH):
             raise ValueError("The OMOP CDM schema manifest is missing or invalid.")
         candidates = {table: table for table in PUBLICATION_FILES}
         _validate_candidates(con, candidates)
-        _validate_lineage(con, "source_record_lineage", candidates)
+        lineage_run_id = _validate_lineage(
+            con, "source_record_lineage", candidates
+        )
+        _validate_mapping_provenance(con, candidates, lineage_run_id)
         counts = {
             table: con.execute(
                 f"SELECT COUNT(*) FROM {quote_identifier(table)}"
@@ -614,4 +714,4 @@ def validate_published_database(db_path=DB_PATH):
     }
 
 if __name__ == "__main__":
-    build_omop_database()
+    build_omop_database(run_id=require_run_id())
