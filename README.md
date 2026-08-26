@@ -6,7 +6,7 @@
 ![Tests](https://img.shields.io/badge/pytest-Passing-brightgreen.svg)
 ![OMOP](https://img.shields.io/badge/OMOP_CDM-v5.4-blueviolet.svg)
 
-An end-to-end clinical data engineering pipeline with production-oriented controls, demonstrating the transformation of clinical trial data from the **CDISC standard (SDTM/ADaM)** into the **OMOP Common Data Model (CDM) v5.4**, bridging the gap between isolated clinical research and global Real-World Evidence (RWE).
+An end-to-end clinical data engineering pipeline with production-oriented controls, demonstrating the transformation of clinical trial data from the **CDISC SDTM standard** into the **OMOP Common Data Model (CDM) v5.4**, bridging the gap between isolated clinical research and global Real-World Evidence (RWE).
 
 ## 🚀 Core Architecture & Engineering Highlights
 
@@ -98,6 +98,11 @@ will remain visibly marked dirty and retain its source fingerprint. Failed
 candidates are deliberately discarded so they cannot alter the published
 database; their step and error trail remains
 available in `logs/pipeline.log`.
+
+Publication also fails closed when Git is unavailable or the repository state
+cannot be determined. `ALLOW_DIRTY_RUN=true` is the explicit development-only
+override for both modified and unknown Git states; such a run retains the source
+manifest but must not be treated as a reproducible release.
 
 The append-only `pipeline_run` ledger is carried from the previous published
 database into each new atomic candidate before the current run is added. This

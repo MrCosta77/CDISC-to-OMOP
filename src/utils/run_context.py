@@ -334,8 +334,20 @@ def collect_source_state(project_root=PROJECT_ROOT):
 
 
 def require_publishable_source_state(source_state, allow_dirty=ALLOW_DIRTY_RUN):
-    """Fail closed when Git can prove that unpublished source would be used."""
-    if source_state.get("git_is_dirty") and not allow_dirty:
+    """Fail closed unless Git identifies a clean, committed source state."""
+    git_is_dirty = source_state.get("git_is_dirty")
+    git_commit = source_state.get("git_commit")
+    git_is_unknown = git_is_dirty is None or (
+        git_is_dirty is False and not git_commit
+    )
+    if git_is_unknown and not allow_dirty:
+        raise RuntimeError(
+            "Refusing to publish because the Git source state could not be "
+            "determined. Run the pipeline from a valid Git checkout with Git "
+            "available, or explicitly set ALLOW_DIRTY_RUN=true for a "
+            "development run."
+        )
+    if git_is_dirty and not allow_dirty:
         examples = source_state.get("git_status", [])[:5]
         detail = "; ".join(examples) if examples else "working tree modified"
         raise RuntimeError(

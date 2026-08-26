@@ -77,10 +77,29 @@ def test_source_manifest_changes_with_executable_source(tmp_path):
 
 
 def test_dirty_source_is_rejected_unless_explicitly_allowed():
-    state = {"git_is_dirty": True, "git_status": [" M src/module.py"]}
+    state = {
+        "git_commit": "abc123",
+        "git_is_dirty": True,
+        "git_status": [" M src/module.py"],
+    }
     with pytest.raises(RuntimeError, match="dirty Git working tree"):
         require_publishable_source_state(state, allow_dirty=False)
     require_publishable_source_state(state, allow_dirty=True)
+
+
+def test_unknown_git_source_is_rejected_unless_explicitly_allowed():
+    state = {"git_commit": None, "git_is_dirty": None, "git_status": []}
+    with pytest.raises(RuntimeError, match="could not be determined"):
+        require_publishable_source_state(state, allow_dirty=False)
+    require_publishable_source_state(state, allow_dirty=True)
+
+    inconsistent_state = {
+        "git_commit": None,
+        "git_is_dirty": False,
+        "git_status": [],
+    }
+    with pytest.raises(RuntimeError, match="could not be determined"):
+        require_publishable_source_state(inconsistent_state, allow_dirty=False)
 
 
 def test_pipeline_run_history_is_carried_forward_idempotently(tmp_path):
