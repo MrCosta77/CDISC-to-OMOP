@@ -8,9 +8,42 @@
 
 An end-to-end clinical data engineering pipeline with production-oriented controls, demonstrating the transformation of clinical trial data from the **CDISC SDTM standard** into the **OMOP Common Data Model (CDM) v5.4**, bridging the gap between isolated clinical research and global Real-World Evidence (RWE).
 
-## 🚀 Core Architecture & Engineering Highlights
+## 🚀 Quick Start
 
-* **Hybrid Semantic Mapping with Guardrails:** Combines deterministic matching through official OHDSI `Maps To` relationships with local LLM candidate proposals. A deterministic mapping is applied only when the valid Standard target is unique; ambiguous exact names or `Maps To` targets remain concept ID `0` for guarded proposal and human review. LLM proposals never update clinical tables directly.
+Get the CDISC to OMOP pipeline running locally:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/MrCosta77/CDISC-to-OMOP.git
+cd CDISC-to-OMOP
+
+# 2. Create and activate a virtual environment
+python -m venv venv
+venv\Scripts\activate  # Windows
+# source venv/bin/activate # Mac/Linux
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Set up environment variables
+cp .env.example .env
+
+# 5. Run the pipeline (ETL + AI Mapping)
+python main.py
+```
+
+## 📐 Architecture Flow
+
+```mermaid
+flowchart LR
+    SDTM[("📊 CDISC SDTM<br>(.sas7bdat)")] --> ETL["⚙️ ETL Transformation<br>(Python)"]
+    ETL --> DB[("🦆 Staging DB<br>(DuckDB)")]
+    DB --> RAG["🔍 LLM / RAG<br>Semantic Mapping"]
+    RAG --> Human["🖥️ Human Review<br>(Decision Gate)"]
+    Human --> CDM[("🟣 OMOP CDM v5.4<br>(omop_cdm.duckdb)")]
+```
+
+## 🧠 Core Architecture & Engineering Highlights
 * **Human Review Gate:** AI proposals are stored in `mapping_decision`, linked to affected events, and must be explicitly approved before entering `approved_mapping_set`. Only approved mappings are applied on a subsequent run and recorded in `mapping_provenance`.
 * **Reproducible Candidate Selection:** Deterministic and retrieval candidates exclude invalid or expired concepts and relationships, use stable Concept ID tie-breaking, and record the vocabulary, prompt and run versions. The configured confidence threshold classifies low-confidence candidates before review.
 * **Reusable Human Policy:** Active approvals are applied before the LLM phase; active rejections are detected before retrieval, so previously rejected terms do not call the model again. AE mapping uses controlled `AEDECOD` while retaining verbatim `AETERM`; CM mapping uses normalized `CMDECOD` while retaining verbatim `CMTRT`.
