@@ -8,6 +8,22 @@
 
 An end-to-end clinical data engineering pipeline with production-oriented controls, demonstrating the transformation of clinical trial data from the **CDISC SDTM standard** into the **OMOP Common Data Model (CDM) v5.4**, bridging the gap between isolated clinical research and global Real-World Evidence (RWE).
 
+## Portfolio evidence — 30-second review
+
+| Question | Evidence in this repository |
+|---|---|
+| **What problem does it address?** | Preserves trial context while transforming SDTM records into an OMOP CDM structure suitable for governed downstream RWE exploration. |
+| **What goes in?** | Synthetic portfolio SDTM `.sas7bdat` domains plus a locally supplied official OHDSI Athena vocabulary export. Source datasets and licensed vocabularies are intentionally not committed. |
+| **What comes out?** | An atomically published `data/cdisc_omop.duckdb` with OMOP clinical tables, run audit data, mapping decisions, provenance, and record-level SDTM lineage. |
+| **How is it verified?** | [`pytest` contracts](tests/) cover schema, input, mapping, lineage, temporal semantics, units, orchestration, and atomic publication; [GitHub Actions](.github/workflows/tests.yml) runs the automated quality gate. |
+| **What demonstrates governance?** | LLM output remains a proposal. A human approval gate controls reusable mappings, and rejected terms remain governed policy rather than silently entering clinical tables. |
+| **What are the limits?** | Portfolio/reference implementation evaluated with synthetic study data. It is not a validated clinical production system, regulatory submission tool, or substitute for institutional validation and security controls. |
+
+The [reproduction instructions](#how-to-reproduce) separate committed code from
+locally supplied clinical inputs and vocabulary assets. The controls demonstrate
+engineering behaviour under the documented test conditions; they do not by
+themselves establish production or regulatory fitness.
+
 ## 🚀 Quick Start
 
 Get the CDISC to OMOP pipeline running locally:
