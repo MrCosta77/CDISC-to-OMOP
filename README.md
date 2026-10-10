@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)
 ![DuckDB](https://img.shields.io/badge/DuckDB-Relational-yellow.svg)
 ![AI/RAG](https://img.shields.io/badge/AI_Mapping-Qwen2.5%20%7C%20Ollama-orange.svg)
-![Tests](https://img.shields.io/badge/pytest-Passing-brightgreen.svg)
+[![Quality gates](https://github.com/MrCosta77/CDISC-to-OMOP/actions/workflows/quality.yml/badge.svg)](https://github.com/MrCosta77/CDISC-to-OMOP/actions/workflows/quality.yml)
 ![OMOP](https://img.shields.io/badge/OMOP_CDM-v5.4-blueviolet.svg)
 
 An end-to-end clinical data engineering pipeline with production-oriented controls, demonstrating the transformation of clinical trial data from the **CDISC SDTM standard** into the **OMOP Common Data Model (CDM) v5.4**, bridging the gap between isolated clinical research and global Real-World Evidence (RWE).
