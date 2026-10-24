@@ -121,11 +121,17 @@ def run_analytics(db_path=DB_PATH):
 
         print("4. PHENOTYPING: RESCUE MEDICATION USAGE (Acetaminophen)")
         print("-" * 60)
+        # Using RxNorm standard concept ID 1125315 ('acetaminophen')
+        # Checks standard concept ID directly and hierarchical descendants if CONCEPT_ANCESTOR is populated
         rescue_res = con.execute("""
             SELECT COUNT(DISTINCT de.person_id)
             FROM drug_exposure de
-            JOIN concept c ON de.drug_concept_id = c.concept_id
-            WHERE LOWER(c.concept_name) LIKE '%acetaminophen%'
+            WHERE de.drug_concept_id = 1125315 -- RxNorm Ingredient: acetaminophen
+               OR de.drug_concept_id IN (
+                   SELECT descendant_concept_id
+                   FROM concept_ancestor
+                   WHERE ancestor_concept_id = 1125315
+               )
         """).fetchone()[0]
         rescue_rate = (rescue_res / pop_res[0]) * 100 if pop_res[0] else 0
         print(
